@@ -1,0 +1,17 @@
+{
+  "app.title": {
+    "defaultMessage": "Rooming List"
+  },
+  "common.loading": {
+    "defaultMessage": "Loading…"
+  },
+  "common.error": {
+    "defaultMessage": "Something went wrong. Please try again."
+  },
+  "error.title": {
+    "defaultMessage": "Something went wrong"
+  },
+  "error.tryAgain": {
+    "defaultMessage": "Try again"
+  }
+}

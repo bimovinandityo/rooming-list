@@ -1,0 +1,14 @@
+// Prisma schema — MongoDB
+// After any model change: run `pnpm run db:generate`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+// Add new models here as the project evolves.
+// After any schema change: run `pnpm run db:generate` to regenerate the client.

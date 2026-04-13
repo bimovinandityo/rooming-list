@@ -1,0 +1,17 @@
+{
+  "app.title": {
+    "defaultMessage": "Rooming List"
+  },
+  "common.loading": {
+    "defaultMessage": "Chargement…"
+  },
+  "common.error": {
+    "defaultMessage": "Une erreur est survenue. Veuillez réessayer."
+  },
+  "error.title": {
+    "defaultMessage": "Une erreur est survenue"
+  },
+  "error.tryAgain": {
+    "defaultMessage": "Réessayer"
+  }
+}
