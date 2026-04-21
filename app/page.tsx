@@ -9,7 +9,7 @@ export default function Home() {
       <h1 className="text-2xl font-bold text-[#101f34]">Rooming List</h1>
       <div className="flex gap-4">
         <Link
-          href="/admin-v2"
+          href="/rooming-list-builder"
           className="px-5 py-2.5 bg-[#101f34] text-white text-sm font-medium rounded-md hover:bg-[#1c2d45] transition-colors"
         >
           Admin view
