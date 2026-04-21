@@ -69,7 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
           { label: "Guest list" },
           {
             label: "Rooming list",
-            href: "/admin-v2",
+            href: "/admin-v2?slide=1",
             activeKey: "participants-rooming-list",
           },
           { label: "Attachments" },

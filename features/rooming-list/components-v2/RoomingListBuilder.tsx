@@ -399,13 +399,10 @@ function RoomModal({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function RoomingListBuilder({ empty = false }: { empty?: boolean }) {
-  const { templates, setTemplates, publish, publishedAt } = useRoomingList();
+export function RoomingListBuilder() {
+  const { setTemplates, publish, publishedAt } = useRoomingList();
 
-  const [buildings, setBuildings] = useState<BuildingTemplate[]>(() => {
-    if (empty) return [];
-    return templates.length > 0 ? templates : INITIAL_BUILDINGS;
-  });
+  const [buildings, setBuildings] = useState<BuildingTemplate[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalKey, setAddModalKey] = useState(0);
   const [editingRoom, setEditingRoom] = useState<{ buildingId: string; room: RoomTemplate } | null>(
@@ -424,9 +421,12 @@ export function RoomingListBuilder({ empty = false }: { empty?: boolean }) {
 
   function handleAddRoom(buildingId: string, room: Omit<RoomTemplate, "id">) {
     const newRoom: RoomTemplate = { ...room, id: `r-${Date.now()}` };
-    const buildingName =
-      AVAILABLE_BUILDINGS.find((b) => b.id === buildingId)?.name ?? "New Building";
     setBuildings((prev) => {
+      // Prototype shortcut: first room added jumps straight to the full demo state
+      if (prev.length === 0) return INITIAL_BUILDINGS;
+
+      const buildingName =
+        AVAILABLE_BUILDINGS.find((b) => b.id === buildingId)?.name ?? "New Building";
       const exists = prev.find((b) => b.id === buildingId);
       if (exists) {
         return prev.map((b) => (b.id === buildingId ? { ...b, rooms: [...b.rooms, newRoom] } : b));
@@ -473,8 +473,12 @@ export function RoomingListBuilder({ empty = false }: { empty?: boolean }) {
   function handleSave() {
     publish(buildings);
     toast.success("Rooming list published", {
-      description: `${totalRooms} room${totalRooms !== 1 ? "s" : ""} · ${totalBeds} bed${totalBeds !== 1 ? "s" : ""} — available in the assignment tool`,
-      duration: 4000,
+      description: `${totalRooms} room${totalRooms !== 1 ? "s" : ""} · ${totalBeds} bed${totalBeds !== 1 ? "s" : ""}`,
+      action: {
+        label: "Go to rooming list →",
+        onClick: () => (window.location.href = "/admin-v2"),
+      },
+      duration: 6000,
     });
   }
 
