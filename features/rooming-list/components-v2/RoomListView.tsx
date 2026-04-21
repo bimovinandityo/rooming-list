@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/shared/utils";
 import { RoomRow } from "./RoomRow";
 import type { Building, Participant } from "../types";
@@ -12,7 +12,6 @@ interface RoomListViewProps {
   onRemove: (roomId: string, slotId: string) => void;
   onSlotClick: (roomId: string, slotId: string) => void;
   onDrop: (roomId: string, slotId: string) => void;
-  onAddRoom: (buildingId: string) => void;
   onChipDragStart: (participantId: string, roomId: string, slotId: string) => void;
   onDragEnd: () => void;
 }
@@ -23,7 +22,6 @@ export function RoomListView({
   onRemove,
   onSlotClick,
   onDrop,
-  onAddRoom,
   onChipDragStart,
   onDragEnd,
 }: RoomListViewProps) {
@@ -71,19 +69,6 @@ export function RoomListView({
                   </span>
                 )}
               </div>
-
-              <button
-                onClick={() => onAddRoom(building.id)}
-                className={cn(
-                  "flex items-center gap-1 text-xs px-2.5 py-1 rounded border transition-colors",
-                  isLate
-                    ? "text-orange-600 border-orange-300 hover:bg-orange-100"
-                    : "text-gray-500 border-gray-200 hover:bg-white",
-                )}
-              >
-                <Plus size={12} />
-                {isLate ? "Add late arrival" : "Room"}
-              </button>
             </div>
 
             {/* Room rows */}

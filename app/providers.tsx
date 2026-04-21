@@ -5,6 +5,7 @@ import { IntlProvider } from "react-intl";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Toaster } from "sonner";
 import type { ReactNode } from "react";
+import { RoomingListProvider } from "@/features/rooming-list/context/RoomingListContext";
 
 import enMessages from "@/locales/compiled/en.json";
 import frMessages from "@/locales/compiled/fr.json";
@@ -27,7 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <NuqsAdapter>
       <IntlProvider locale={locale} messages={messages[locale]} defaultLocale="en">
         <QueryProvider>
-          {children}
+          <RoomingListProvider>{children}</RoomingListProvider>
           <Toaster position="bottom-right" richColors />
         </QueryProvider>
       </IntlProvider>

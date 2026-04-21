@@ -4,6 +4,7 @@ export interface Participant {
   isVip?: boolean;
   isPmr?: boolean; // reduced mobility
   isLateArrival?: boolean;
+  avatarUrl?: string;
 }
 
 export interface RoomSlot {
@@ -17,6 +18,7 @@ export interface Room {
   bedDescription: string;
   privateBathroom: boolean;
   slots: RoomSlot[];
+  photoUrl?: string;
 }
 
 export interface Building {

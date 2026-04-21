@@ -1,6 +1,6 @@
 "use client";
 
-import { X, ChevronDown } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/shared/utils";
 import type { Room, Participant } from "../types";
 
@@ -30,11 +30,13 @@ export function RoomRow({
   onDragEnd,
 }: RoomRowProps) {
   const isFull = room.slots.every((s) => s.participant);
+  const hasPmr = room.slots.some((s) => s.participant?.isPmr);
 
   return (
     <div
       className={cn(
-        "flex items-center gap-4 px-4 py-3 border-b border-gray-100 last:border-0 transition-colors",
+        "flex items-center gap-4 px-4 py-3 border-b border-gray-100 last:border-0 transition-colors border-l-2",
+        hasPmr && !isDropTarget ? "border-l-blue-300" : "border-l-transparent",
         isDropTarget && !isFull && "bg-blue-50",
         isDropTarget && isFull && "bg-red-50/50",
       )}
@@ -57,14 +59,9 @@ export function RoomRow({
         )}
       </div>
 
-      {/* Bed count */}
-      <div className="w-16 shrink-0">
-        <span
-          title={room.bedDescription}
-          className="text-sm text-slate-500 underline decoration-dotted underline-offset-2 cursor-help"
-        >
-          {room.slots.length} bed{room.slots.length > 1 ? "s" : ""}
-        </span>
+      {/* Bed description */}
+      <div className="w-44 shrink-0">
+        <span className="text-xs text-gray-400">{room.bedDescription}</span>
       </div>
 
       {/* Participant chips + empty slots */}
@@ -120,11 +117,6 @@ export function RoomRow({
           ),
         )}
       </div>
-
-      {/* Action */}
-      <button className="shrink-0 text-gray-300 hover:text-gray-500 transition-colors">
-        <ChevronDown size={15} />
-      </button>
     </div>
   );
 }

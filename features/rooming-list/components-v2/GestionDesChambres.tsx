@@ -2,12 +2,14 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Upload, Plus, Shuffle, RotateCcw } from "lucide-react";
+import { Shuffle, RotateCcw, X } from "lucide-react";
 import { RoomListView } from "./RoomListView";
 import { ParticipantDrawer } from "./ParticipantDrawer";
 import { AssignParticipantModal } from "./AssignParticipantModal";
 import { mockBuildings, mockParticipants } from "../mock/data";
 import { cn } from "@/shared/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { useRoomingList } from "../context/RoomingListContext";
 import type { Building, Participant } from "../types";
 
 type RoomFilter = "all" | "incomplete" | "full";
@@ -18,8 +20,10 @@ const FILTERS: { key: RoomFilter; label: string }[] = [
   { key: "full", label: "Full" },
 ];
 
-export function GestionDesChambres() {
-  const [buildings, setBuildings] = useState<Building[]>(mockBuildings);
+export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean }) {
+  const { publishedBuildings, publishedAt } = useRoomingList();
+
+  const [buildings, setBuildings] = useState<Building[]>(() => publishedBuildings ?? mockBuildings);
   const [participants, setParticipants] = useState<Participant[]>(mockParticipants);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingSource, setDraggingSource] = useState<{ roomId: string; slotId: string } | null>(
@@ -27,6 +31,8 @@ export function GestionDesChambres() {
   );
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
   const [targetSlot, setTargetSlot] = useState<{ roomId: string; slotId: string } | null>(null);
+  const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
+  const [showBuilderBanner, setShowBuilderBanner] = useState(true);
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const assignedIds = new Set(
@@ -130,7 +136,7 @@ export function GestionDesChambres() {
         })),
       );
       const targetRoom = allRooms.find((r) => r.id === roomId);
-      toast.success(`${draggingParticipant.name} → ${targetRoom?.name ?? "chambre"}`, {
+      toast.success(`${draggingParticipant.name} → ${targetRoom?.name ?? "room"}`, {
         duration: 2000,
       });
     } else {
@@ -150,25 +156,11 @@ export function GestionDesChambres() {
     setTargetSlot({ roomId, slotId });
   }
 
-  function handleDrawerAssign(participant: Participant) {
-    for (const building of buildings) {
-      for (const room of building.rooms) {
-        const empty = room.slots.find((s) => !s.participant);
-        if (empty) {
-          assignToSlot(room.id, empty.id, participant);
-          toast.success(`${participant.name} → ${room.name}`, { duration: 2000 });
-          return;
-        }
-      }
-    }
-    toast.error("No beds available");
-  }
-
   function handleModalAssign(participant: Participant) {
     if (!targetSlot) return;
     assignToSlot(targetSlot.roomId, targetSlot.slotId, participant);
     const room = allRooms.find((r) => r.id === targetSlot.roomId);
-    toast.success(`${participant.name} → ${room?.name ?? "chambre"}`, { duration: 2000 });
+    toast.success(`${participant.name} → ${room?.name ?? "room"}`, { duration: 2000 });
     setTargetSlot(null);
   }
 
@@ -177,6 +169,10 @@ export function GestionDesChambres() {
       toast.info("No assignments to clear");
       return;
     }
+    setShowStartOverConfirm(true);
+  }
+
+  function handleConfirmStartOver() {
     const snapshot = buildings;
     setBuildings((prev) =>
       prev.map((b) => ({
@@ -187,6 +183,7 @@ export function GestionDesChambres() {
         })),
       })),
     );
+    setShowStartOverConfirm(false);
     toast.success("All assignments cleared", {
       action: { label: "Undo", onClick: () => setBuildings(snapshot) },
       duration: 5000,
@@ -221,12 +218,6 @@ export function GestionDesChambres() {
     });
   }
 
-  function handleMarkLate(id: string) {
-    setParticipants((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isLateArrival: !p.isLateArrival } : p)),
-    );
-  }
-
   function handleAddLateArrival(name: string, isVip: boolean, isPmr: boolean) {
     const newP: Participant = {
       id: `p-late-${Date.now()}`,
@@ -238,40 +229,18 @@ export function GestionDesChambres() {
     setParticipants((prev) => [...prev, newP]);
   }
 
-  function handleAddRoom(buildingId: string) {
-    const ts = Date.now();
-    const building = buildings.find((b) => b.id === buildingId);
-    setBuildings((prev) =>
-      prev.map((b) =>
-        b.id !== buildingId
-          ? b
-          : {
-              ...b,
-              rooms: [
-                ...b.rooms,
-                {
-                  id: `r-${ts}`,
-                  name: "New room",
-                  bedDescription: "1 single bed",
-                  privateBathroom: false,
-                  slots: [{ id: `s-${ts}` }],
-                },
-              ],
-            },
-      ),
-    );
-    toast.success(`Room added to ${building?.name ?? "building"}`);
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
-          <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
-        </div>
+        {!hideTitle && (
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
+            <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
+          </div>
+        )}
+        {hideTitle && <div />}
         <div className="flex items-center gap-2">
           <button
             onClick={handleStartOver}
@@ -279,14 +248,6 @@ export function GestionDesChambres() {
           >
             <RotateCcw size={13} />
             Start over
-          </button>
-          <button className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors">
-            <Upload size={13} />
-            Import
-          </button>
-          <button className="flex items-center gap-1.5 text-sm border border-slate-800 rounded-md px-3 py-1.5 text-slate-800 hover:bg-slate-50 transition-colors">
-            <Plus size={13} />
-            Add room
           </button>
           <button
             onClick={handleAutoAssign}
@@ -297,6 +258,30 @@ export function GestionDesChambres() {
           </button>
         </div>
       </div>
+
+      {/* Builder source banner */}
+      {publishedBuildings && publishedAt && showBuilderBanner && (
+        <div className="flex items-center justify-between px-6 py-2 bg-blue-50 border-b border-blue-100">
+          <span className="text-xs text-blue-600">
+            Rooms configured via Rooming list builder · Published at{" "}
+            {publishedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+          <div className="flex items-center gap-3">
+            <a
+              href="/rooming-list-builder"
+              className="text-xs text-blue-600 font-medium hover:text-blue-800 underline underline-offset-2"
+            >
+              Edit configuration
+            </a>
+            <button
+              onClick={() => setShowBuilderBanner(false)}
+              className="text-blue-400 hover:text-blue-700 transition-colors"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter + stats row */}
       <div className="flex items-center justify-between px-6 py-2 border-b border-gray-100">
@@ -343,7 +328,6 @@ export function GestionDesChambres() {
           onRemove={handleRemove}
           onSlotClick={handleSlotClick}
           onDrop={handleDrop}
-          onAddRoom={handleAddRoom}
           onChipDragStart={handleChipDragStart}
           onDragEnd={handleDragEnd}
         />
@@ -355,8 +339,6 @@ export function GestionDesChambres() {
           isRoomChipDragging={draggingSource !== null}
           onDragStart={setDraggingId}
           onDragEnd={handleDragEnd}
-          onAssign={handleDrawerAssign}
-          onMarkLate={handleMarkLate}
           onAddLateArrival={handleAddLateArrival}
           onUnassignDrop={() => {
             if (!draggingSource) return;
@@ -373,6 +355,37 @@ export function GestionDesChambres() {
         assignedIds={assignedIds}
         onAssign={handleModalAssign}
       />
+
+      <Dialog
+        open={showStartOverConfirm}
+        onOpenChange={(v) => !v && setShowStartOverConfirm(false)}
+      >
+        <DialogContent className="w-[400px] max-w-[400px] p-0 gap-0">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b border-gray-100">
+            <DialogTitle className="text-base font-bold text-slate-800">Start over?</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 py-4">
+            <p className="text-sm text-gray-500">
+              This will clear all {assignedIds.size} assignment{assignedIds.size !== 1 ? "s" : ""}.
+              You can undo right after.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <button
+              onClick={() => setShowStartOverConfirm(false)}
+              className="text-sm px-3 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmStartOver}
+              className="text-sm px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+            >
+              Clear all
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

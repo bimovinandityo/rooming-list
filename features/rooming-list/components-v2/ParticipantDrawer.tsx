@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { GripVertical, Clock, UserPlus } from "lucide-react";
+import { GripVertical, UserPlus } from "lucide-react";
 import { cn } from "@/shared/utils";
 import type { Participant } from "../types";
 
@@ -12,8 +12,6 @@ interface ParticipantDrawerProps {
   isRoomChipDragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
-  onAssign: (participant: Participant) => void;
-  onMarkLate: (id: string) => void;
   onAddLateArrival: (name: string, isVip: boolean, isPmr: boolean) => void;
   onUnassignDrop: () => void;
 }
@@ -25,8 +23,6 @@ export function ParticipantDrawer({
   isRoomChipDragging,
   onDragStart,
   onDragEnd,
-  onAssign,
-  onMarkLate,
   onAddLateArrival,
   onUnassignDrop,
 }: ParticipantDrawerProps) {
@@ -147,8 +143,6 @@ export function ParticipantDrawer({
             isDragging={draggingId === p.id}
             onDragStart={() => onDragStart(p.id)}
             onDragEnd={onDragEnd}
-            onAssign={() => onAssign(p)}
-            onMarkLate={() => onMarkLate(p.id)}
           />
         ))}
 
@@ -228,8 +222,6 @@ export function ParticipantDrawer({
             isDragging={draggingId === p.id}
             onDragStart={() => onDragStart(p.id)}
             onDragEnd={onDragEnd}
-            onAssign={() => onAssign(p)}
-            onMarkLate={() => onMarkLate(p.id)}
             isLate
           />
         ))}
@@ -249,16 +241,12 @@ function DrawerRow({
   isDragging,
   onDragStart,
   onDragEnd,
-  onAssign,
-  onMarkLate,
   isLate,
 }: {
   participant: Participant;
   isDragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
-  onAssign: () => void;
-  onMarkLate: () => void;
   isLate?: boolean;
 }) {
   return (
@@ -272,10 +260,6 @@ function DrawerRow({
       )}
     >
       <GripVertical size={12} className="text-gray-300 shrink-0" />
-
-      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
-        {participant.name.charAt(0)}
-      </div>
 
       <div className="flex-1 min-w-0">
         <p className="text-sm text-slate-700 truncate">{participant.name}</p>
@@ -296,28 +280,6 @@ function DrawerRow({
             </span>
           )}
         </div>
-      </div>
-
-      {/* Hover actions */}
-      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
-        <button
-          onClick={onMarkLate}
-          title={isLate ? "Remove late arrival status" : "Mark as late arrival"}
-          className={cn(
-            "p-1 rounded transition-colors",
-            isLate
-              ? "text-orange-500 hover:bg-orange-50"
-              : "text-gray-400 hover:text-orange-500 hover:bg-orange-50",
-          )}
-        >
-          <Clock size={12} />
-        </button>
-        <button
-          onClick={onAssign}
-          className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 transition-colors"
-        >
-          + Assign
-        </button>
       </div>
     </div>
   );
