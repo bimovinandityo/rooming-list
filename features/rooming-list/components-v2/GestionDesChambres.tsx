@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, Suspense } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Shuffle, RotateCcw, X } from "lucide-react";
 import { RoomListView } from "./RoomListView";
@@ -332,22 +332,20 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
           onDragEnd={handleDragEnd}
         />
 
-        <Suspense>
-          <ParticipantDrawer
-            participants={participants}
-            assignedIds={assignedIds}
-            draggingId={draggingId}
-            isRoomChipDragging={draggingSource !== null}
-            onDragStart={setDraggingId}
-            onDragEnd={handleDragEnd}
-            onAddLateArrival={handleAddLateArrival}
-            onUnassignDrop={() => {
-              if (!draggingSource) return;
-              handleRemove(draggingSource.roomId, draggingSource.slotId);
-              handleDragEnd();
-            }}
-          />
-        </Suspense>
+        <ParticipantDrawer
+          participants={participants}
+          assignedIds={assignedIds}
+          draggingId={draggingId}
+          isRoomChipDragging={draggingSource !== null}
+          onDragStart={setDraggingId}
+          onDragEnd={handleDragEnd}
+          onAddLateArrival={handleAddLateArrival}
+          onUnassignDrop={() => {
+            if (!draggingSource) return;
+            handleRemove(draggingSource.roomId, draggingSource.slotId);
+            handleDragEnd();
+          }}
+        />
       </div>
 
       <AssignParticipantModal

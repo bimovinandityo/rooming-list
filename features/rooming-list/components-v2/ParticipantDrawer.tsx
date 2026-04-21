@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useState, useRef } from "react";
 import { GripVertical, UserPlus } from "lucide-react";
 import { cn } from "@/shared/utils";
 import type { Participant } from "../types";
@@ -27,22 +26,6 @@ export function ParticipantDrawer({
   onAddLateArrival,
   onUnassignDrop,
 }: ParticipantDrawerProps) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const [shouldAnimate, setShouldAnimate] = useState(false);
-
-  useEffect(() => {
-    if (searchParams.get("slide") === "1") {
-      setShouldAnimate(true);
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("slide");
-      const newUrl = params.size > 0 ? `${pathname}?${params}` : pathname;
-      router.replace(newUrl, { scroll: false });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "vip" | "pmr">("all");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -89,7 +72,7 @@ export function ParticipantDrawer({
     <div
       className={cn(
         "w-72 shrink-0 flex flex-col border-l border-gray-200 bg-white relative transition-colors",
-        shouldAnimate && "animate-slide-in-right",
+        "animate-slide-in-right",
         isRoomChipDragging && isOver && "bg-red-50",
       )}
       onDragOver={(e) => {
