@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ShoppingCart,
   FileText,
@@ -14,7 +16,7 @@ import {
   Send,
 } from "lucide-react";
 import Link from "next/link";
-import type { ElementType, ReactNode } from "react";
+import { useEffect, useRef, type ElementType, type ReactNode } from "react";
 
 export type ActiveKey = "participants-rooming-list" | "rooming-list-builder";
 
@@ -116,6 +118,14 @@ export function NabooShell({
   children: ReactNode;
   activeItem?: ActiveKey;
 }) {
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (activeItem === "rooming-list-builder" && sidebarRef.current) {
+      sidebarRef.current.scrollTo({ top: sidebarRef.current.scrollHeight, behavior: "smooth" });
+    }
+  }, [activeItem]);
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white">
       {/* Top header */}
@@ -171,7 +181,10 @@ export function NabooShell({
 
       <div className="flex flex-1 min-h-0">
         {/* Left sidebar */}
-        <aside className="w-[280px] shrink-0 border-r border-gray-100 overflow-y-auto flex flex-col bg-white">
+        <aside
+          ref={sidebarRef}
+          className="w-[280px] shrink-0 border-r border-gray-100 overflow-y-auto flex flex-col bg-white"
+        >
           <div className="px-4 pt-5 pb-4">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
               My advisor
