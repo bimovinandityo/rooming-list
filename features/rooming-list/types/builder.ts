@@ -10,7 +10,10 @@ export interface RoomTemplate {
   bedTypes: BedTypeEntry[];
   privateBathroom: boolean;
   count: number;
-  photoUrl?: string;
+  floor?: number;
+  vipOnly?: boolean;
+  photos?: string[];
+  primaryPhotoIndex?: number;
 }
 
 export interface BuildingTemplate {

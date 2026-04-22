@@ -12,7 +12,7 @@ interface ParticipantDrawerProps {
   isRoomChipDragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
-  onAddLateArrival: (name: string, isVip: boolean, isPmr: boolean) => void;
+  onAddLateArrival: (name: string, isVip: boolean, isAccessibility: boolean) => void;
   onUnassignDrop: () => void;
 }
 
@@ -27,11 +27,11 @@ export function ParticipantDrawer({
   onUnassignDrop,
 }: ParticipantDrawerProps) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "vip" | "pmr">("all");
+  const [filter, setFilter] = useState<"all" | "vip" | "accessibility">("all");
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newVip, setNewVip] = useState(false);
-  const [newPmr, setNewPmr] = useState(false);
+  const [newAccessibility, setNewAccessibility] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const unassigned = participants.filter((p) => !assignedIds.has(p.id));
@@ -42,7 +42,9 @@ export function ParticipantDrawer({
     return list.filter((p) => {
       const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
       const matchesFilter =
-        filter === "all" || (filter === "vip" && p.isVip) || (filter === "pmr" && p.isPmr);
+        filter === "all" ||
+        (filter === "vip" && p.isVip) ||
+        (filter === "accessibility" && p.isAccessibility);
       return matchesSearch && matchesFilter;
     });
   }
@@ -54,10 +56,10 @@ export function ParticipantDrawer({
   function handleAddSubmit() {
     const name = newName.trim();
     if (!name) return;
-    onAddLateArrival(name, newVip, newPmr);
+    onAddLateArrival(name, newVip, newAccessibility);
     setNewName("");
     setNewVip(false);
-    setNewPmr(false);
+    setNewAccessibility(false);
     setShowAddForm(false);
   }
 
@@ -117,7 +119,7 @@ export function ParticipantDrawer({
           className="w-full text-sm border border-gray-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400 transition-colors"
         />
         <div className="flex gap-1.5">
-          {(["all", "vip", "pmr"] as const).map((f) => (
+          {(["all", "vip", "accessibility"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -128,7 +130,7 @@ export function ParticipantDrawer({
                   : "border-gray-200 text-gray-500 hover:border-gray-300",
               )}
             >
-              {f === "all" ? "All" : f.toUpperCase()}
+              {f === "all" ? "All" : f === "vip" ? "VIP" : "Accessibility"}
             </button>
           ))}
         </div>
@@ -191,11 +193,11 @@ export function ParticipantDrawer({
               <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  checked={newPmr}
-                  onChange={(e) => setNewPmr(e.target.checked)}
+                  checked={newAccessibility}
+                  onChange={(e) => setNewAccessibility(e.target.checked)}
                   className="rounded"
                 />
-                <span className="font-bold text-blue-700">PMR</span>
+                <span className="font-bold text-blue-700">Accessibility</span>
               </label>
               <div className="flex gap-1.5 ml-auto">
                 <button
@@ -270,9 +272,9 @@ function DrawerRow({
               VIP
             </span>
           )}
-          {participant.isPmr && (
+          {participant.isAccessibility && (
             <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
-              PMR
+              ♿
             </span>
           )}
           {isLate && (

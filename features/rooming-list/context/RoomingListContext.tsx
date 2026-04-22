@@ -24,7 +24,9 @@ function templatesToBuildings(templates: BuildingTemplate[]): Building[] {
         name: rt.count > 1 ? `${rt.name} ${i + 1}` : rt.name,
         bedDescription: describeBeds(rt),
         privateBathroom: rt.privateBathroom,
-        photoUrl: rt.photoUrl,
+        photoUrl: rt.photos?.[rt.primaryPhotoIndex ?? 0],
+        floor: rt.floor,
+        vipOnly: rt.vipOnly,
         slots: Array.from({ length: totalBeds }, (_, j) => ({
           id: `slot-${rt.id}-${i}-${j}`,
         })),

@@ -74,7 +74,7 @@ export function AssignParticipantModal({
                     VIP
                   </span>
                 )}
-                {p.isPmr && <span className="text-sm">♿</span>}
+                {p.isAccessibility && <span className="text-sm">♿</span>}
               </div>
             </button>
           ))}

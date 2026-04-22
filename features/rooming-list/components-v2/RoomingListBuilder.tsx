@@ -18,6 +18,12 @@ const AVAILABLE_BUILDINGS = [
   { id: "b3", name: "Annex" },
 ];
 
+const STOCK_PHOTOS = [
+  "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600&q=80",
+  "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80",
+  "https://images.unsplash.com/photo-1455587734955-081b22074882?w=600&q=80",
+];
+
 const INITIAL_BUILDINGS: BuildingTemplate[] = [
   {
     id: "b1",
@@ -168,24 +174,59 @@ function RoomModal({
 }) {
   const isEditing = !!initialRoom;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [stockIdx, setStockIdx] = useState(0);
 
   const [buildingId, setBuildingId] = useState(initialBuildingId ?? AVAILABLE_BUILDINGS[0].id);
   const [name, setName] = useState(initialRoom?.name ?? "");
+  const [floor, setFloor] = useState<string>(
+    initialRoom?.floor != null ? String(initialRoom.floor) : "",
+  );
   const [bedTypes, setBedTypes] = useState<BedTypeEntry[]>(
     initialRoom?.bedTypes ?? [{ id: "new-0", type: "Double bed", count: 1 }],
   );
   const [privateBathroom, setPrivateBathroom] = useState(initialRoom?.privateBathroom ?? false);
+  const [vipOnly, setVipOnly] = useState(initialRoom?.vipOnly ?? false);
   const [count, setCount] = useState(initialRoom?.count ?? 1);
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(initialRoom?.photoUrl);
+  const [photos, setPhotos] = useState<string[]>(initialRoom?.photos ?? []);
+  const [primaryPhotoIndex, setPrimaryPhotoIndex] = useState(initialRoom?.primaryPhotoIndex ?? 0);
+
+  function addStockPhoto() {
+    if (photos.length >= 3) return;
+    setPhotos((prev) => [...prev, STOCK_PHOTOS[stockIdx % STOCK_PHOTOS.length]]);
+    setStockIdx((i) => i + 1);
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setPhotoUrl(ev.target?.result as string);
-    reader.readAsDataURL(file);
-    // Reset input so same file can be re-selected
+    const files = Array.from(e.target.files ?? []).slice(0, 3 - photos.length);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) =>
+        setPhotos((prev) => (prev.length < 3 ? [...prev, ev.target?.result as string] : prev));
+      reader.readAsDataURL(file);
+    });
     e.target.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, 3 - photos.length);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) =>
+        setPhotos((prev) => (prev.length < 3 ? [...prev, ev.target?.result as string] : prev));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removePhoto(idx: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+    if (primaryPhotoIndex >= idx && primaryPhotoIndex > 0) {
+      setPrimaryPhotoIndex((p) => p - 1);
+    }
   }
 
   function addBedType() {
@@ -203,17 +244,21 @@ function RoomModal({
   function handleSubmit() {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const floorVal = floor.trim() !== "" ? parseInt(floor) : undefined;
+    const roomData = {
+      name: trimmed,
+      bedTypes,
+      privateBathroom,
+      vipOnly: vipOnly || undefined,
+      count,
+      floor: floorVal,
+      photos,
+      primaryPhotoIndex,
+    };
     if (isEditing && onSave && initialRoom) {
-      onSave(buildingId, {
-        ...initialRoom,
-        name: trimmed,
-        bedTypes,
-        privateBathroom,
-        count,
-        photoUrl,
-      });
+      onSave(buildingId, { ...initialRoom, ...roomData });
     } else if (onAdd) {
-      onAdd(buildingId, { name: trimmed, bedTypes, privateBathroom, count, photoUrl });
+      onAdd(buildingId, roomData);
     }
     onClose();
   }
@@ -229,7 +274,7 @@ function RoomModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 py-5 flex flex-col gap-5 max-h-[540px] overflow-y-auto">
+        <div className="px-6 py-5 flex flex-col gap-5 max-h-[560px] overflow-y-auto">
           {/* Building */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-gray-700">Accommodation</label>
@@ -251,59 +296,115 @@ function RoomModal({
             </div>
           </div>
 
-          {/* Name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-700">Room name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="E.g. Deluxe room"
-              autoFocus
-              className="border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-400 transition-colors"
-            />
+          {/* Name + Floor row */}
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-medium text-gray-700">Room name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                placeholder="E.g. Deluxe room"
+                autoFocus
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-400 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 w-28">
+              <label className="text-sm font-medium text-gray-700">
+                Floor
+                <span className="ml-1 text-xs font-normal text-gray-400">(optional)</span>
+              </label>
+              <input
+                value={floor}
+                onChange={(e) => setFloor(e.target.value.replace(/[^0-9-]/g, ""))}
+                placeholder="E.g. 2"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-400 transition-colors"
+              />
+            </div>
           </div>
 
-          {/* Room photo */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-700">Room photo</label>
+          {/* Room photos */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-700">
+              Photos
+              <span className="ml-1.5 text-xs font-normal text-gray-400">{photos.length}/3</span>
+            </label>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={handleFileChange}
             />
-            {photoUrl ? (
-              <div className="relative group w-full h-36 rounded-lg overflow-hidden border border-gray-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoUrl} alt="Room" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs bg-white text-gray-800 font-medium px-3 py-1.5 rounded-md shadow hover:bg-gray-50 transition-colors"
+
+            <div className="flex gap-2">
+              {/* Existing photos */}
+              {photos.map((url, idx) => {
+                const isPrimary = idx === primaryPhotoIndex;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setPrimaryPhotoIndex(idx)}
+                    className={`relative group w-[120px] h-[84px] rounded-lg overflow-hidden border-2 cursor-pointer shrink-0 transition-all ${
+                      isPrimary ? "border-gray-800" : "border-gray-200 hover:border-gray-400"
+                    }`}
                   >
-                    Change
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPhotoUrl(undefined)}
-                    className="w-7 h-7 bg-white text-gray-600 rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors"
-                  >
-                    <XIcon size={13} />
-                  </button>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Photo ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {isPrimary && (
+                      <div className="absolute bottom-1.5 left-1.5 bg-gray-900/80 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
+                        Primary
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePhoto(idx);
+                      }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-white"
+                    >
+                      <XIcon size={10} className="text-gray-700" />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Add photo slot */}
+              {photos.length < 3 && (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={handleDrop}
+                  className={`flex flex-col items-center justify-center gap-1.5 w-[120px] h-[84px] rounded-lg border-2 border-dashed transition-colors cursor-pointer shrink-0 ${
+                    isDragOver
+                      ? "border-gray-400 bg-gray-100 text-gray-600"
+                      : "border-gray-200 text-gray-400 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                  onClick={addStockPhoto}
+                >
+                  <ImagePlus size={16} />
+                  <span className="text-[11px] text-center leading-tight px-1">
+                    Add photo
+                    <br />
+                    <span className="text-gray-300">or drag &amp; drop</span>
+                  </span>
                 </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 w-full h-28 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 hover:border-gray-300 hover:text-gray-500 hover:bg-gray-50 transition-colors"
-              >
-                <ImagePlus size={20} />
-                <span className="text-xs">Upload a photo</span>
-              </button>
+              )}
+            </div>
+
+            {photos.length > 1 && (
+              <p className="text-[11px] text-gray-400">
+                Click a photo to set it as the primary thumbnail.
+              </p>
             )}
           </div>
 
@@ -342,6 +443,17 @@ function RoomModal({
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-gray-700">Private bathroom</label>
             <Switch checked={privateBathroom} onCheckedChange={setPrivateBathroom} />
+          </div>
+
+          {/* VIP only */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-700">VIP only</label>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Reserved exclusively for VIP participants
+              </p>
+            </div>
+            <Switch checked={vipOnly} onCheckedChange={setVipOnly} />
           </div>
 
           {/* Count */}
@@ -402,7 +514,7 @@ function RoomModal({
 export function RoomingListBuilder() {
   const { setTemplates, publish, publishedAt } = useRoomingList();
 
-  const [buildings, setBuildings] = useState<BuildingTemplate[]>([]);
+  const [buildings, setBuildings] = useState<BuildingTemplate[]>(INITIAL_BUILDINGS);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalKey, setAddModalKey] = useState(0);
   const [editingRoom, setEditingRoom] = useState<{ buildingId: string; room: RoomTemplate } | null>(
@@ -417,14 +529,10 @@ export function RoomingListBuilder() {
   const allRooms = buildings.flatMap((b) => b.rooms);
   const totalRooms = allRooms.reduce((sum, r) => sum + r.count, 0);
   const totalBeds = allRooms.reduce((sum, r) => sum + r.count * totalBedsInRoom(r.bedTypes), 0);
-  const hasRooms = allRooms.length > 0;
 
   function handleAddRoom(buildingId: string, room: Omit<RoomTemplate, "id">) {
     const newRoom: RoomTemplate = { ...room, id: `r-${Date.now()}` };
     setBuildings((prev) => {
-      // Prototype shortcut: first room added jumps straight to the full demo state
-      if (prev.length === 0) return INITIAL_BUILDINGS;
-
       const buildingName =
         AVAILABLE_BUILDINGS.find((b) => b.id === buildingId)?.name ?? "New Building";
       const exists = prev.find((b) => b.id === buildingId);
@@ -501,56 +609,17 @@ export function RoomingListBuilder() {
           <span className="text-sm text-gray-500">Show to participants</span>
           <Switch checked={showParticipants} onCheckedChange={setShowParticipants} />
         </div>
-        {hasRooms && (
-          <button
-            onClick={handleSave}
-            className="text-sm px-4 py-2 bg-[#e8f747] text-gray-900 font-medium rounded-md hover:bg-[#ddf03f] transition-colors"
-          >
-            {publishedAt ? "Re-publish" : "Publish"}
-          </button>
-        )}
+        <button
+          onClick={handleSave}
+          className="text-sm px-4 py-2 bg-[#e8f747] text-gray-900 font-medium rounded-md hover:bg-[#ddf03f] transition-colors"
+        >
+          {publishedAt ? "Re-publish" : "Publish"}
+        </button>
       </div>
     </div>
   );
 
-  // ── Empty state ────────────────────────────────────────────────────────────
-
-  if (!hasRooms) {
-    return (
-      <div className="flex flex-col h-full">
-        {pageHeader}
-        <div className="flex-1 flex flex-col items-center justify-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
-            <BedDouble size={24} className="text-gray-300" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-gray-700">No rooms configured</p>
-            <p className="text-sm text-gray-400 mt-1 max-w-xs leading-relaxed">
-              Add the room types available for your event.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setAddModalKey((k) => k + 1);
-              setShowAddModal(true);
-            }}
-            className="flex items-center gap-2 bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
-          >
-            <Plus size={14} />
-            Add room
-          </button>
-        </div>
-        <RoomModal
-          key={addModalKey}
-          open={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onAdd={handleAddRoom}
-        />
-      </div>
-    );
-  }
-
-  // ── Populated state ────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -596,10 +665,10 @@ export function RoomingListBuilder() {
                 >
                   {/* Room thumbnail */}
                   <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-gray-100 border border-gray-200 flex items-center justify-center">
-                    {room.photoUrl ? (
+                    {room.photos?.[room.primaryPhotoIndex ?? 0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={room.photoUrl}
+                        src={room.photos[room.primaryPhotoIndex ?? 0]}
                         alt={room.name}
                         className="w-full h-full object-cover"
                       />

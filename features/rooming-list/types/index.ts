@@ -1,8 +1,9 @@
 export interface Participant {
   id: string;
   name: string;
+  gender?: "M" | "F";
   isVip?: boolean;
-  isPmr?: boolean; // reduced mobility
+  isAccessibility?: boolean;
   isLateArrival?: boolean;
   avatarUrl?: string;
 }
@@ -17,6 +18,8 @@ export interface Room {
   name: string;
   bedDescription: string;
   privateBathroom: boolean;
+  floor?: number;
+  vipOnly?: boolean;
   slots: RoomSlot[];
   photoUrl?: string;
 }

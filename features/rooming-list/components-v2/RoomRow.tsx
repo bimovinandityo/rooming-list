@@ -30,7 +30,7 @@ export function RoomRow({
   onDragEnd,
 }: RoomRowProps) {
   const isFull = room.slots.every((s) => s.participant);
-  const hasPmr = room.slots.some((s) => s.participant?.isPmr);
+  const hasPmr = room.slots.some((s) => s.participant?.isAccessibility);
 
   return (
     <div
@@ -83,7 +83,7 @@ export function RoomRow({
                   VIP
                 </span>
               )}
-              {slot.participant.isPmr && (
+              {slot.participant.isAccessibility && (
                 <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
                   PMR
                 </span>

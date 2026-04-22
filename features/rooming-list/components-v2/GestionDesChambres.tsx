@@ -33,6 +33,12 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   const [targetSlot, setTargetSlot] = useState<{ roomId: string; slotId: string } | null>(null);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [showBuilderBanner, setShowBuilderBanner] = useState(true);
+  const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
+  const [rules, setRules] = useState({
+    noGenderMix: true,
+    vipAlone: true,
+    accessibilityFirstFloor: true,
+  });
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const assignedIds = new Set(
@@ -197,33 +203,89 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
       return;
     }
     const snapshot = buildings;
+
+    // Sort: accessibility first, then VIP, then regular
+    const sorted = [...unassigned].sort((a, b) => {
+      if (a.isAccessibility && !b.isAccessibility) return -1;
+      if (!a.isAccessibility && b.isAccessibility) return 1;
+      if (a.isVip && !b.isVip) return -1;
+      if (!a.isVip && b.isVip) return 1;
+      return 0;
+    });
+
     setBuildings((prev) => {
-      const next = structuredClone(prev);
-      for (const p of unassigned) {
-        outer: for (const b of next) {
+      const next = structuredClone(prev) as Building[];
+      let placed = 0;
+      let skipped = 0;
+
+      for (const p of sorted) {
+        type RoomRef = { room: (typeof next)[0]["rooms"][0]; score: number };
+        const candidates: RoomRef[] = [];
+
+        for (const b of next) {
           for (const r of b.rooms) {
-            const slot = r.slots.find((s) => !s.participant);
-            if (slot) {
-              slot.participant = p;
-              break outer;
+            const freeSlot = r.slots.find((s) => !s.participant);
+            if (!freeSlot) continue;
+
+            const occupants = r.slots.map((s) => s.participant).filter(Boolean) as Participant[];
+
+            // VIP alone: VIPs only in vipOnly rooms; non-VIPs cannot enter vipOnly rooms
+            if (rules.vipAlone) {
+              if (p.isVip && !r.vipOnly) continue;
+              if (!p.isVip && r.vipOnly) continue;
             }
+
+            // No gender mix: if room has occupants with a gender, must match
+            if (rules.noGenderMix && p.gender) {
+              const roomGender = occupants.find((o) => o.gender)?.gender;
+              if (roomGender && roomGender !== p.gender) continue;
+            }
+
+            // Score (lower = better)
+            let score = 0;
+            if (rules.accessibilityFirstFloor && p.isAccessibility) {
+              score += r.floor === 1 ? -100 : 50;
+            }
+            if (p.isVip && r.vipOnly) score -= 20;
+            if (occupants.length > 0) score -= 5; // prefer filling partially-used rooms
+
+            candidates.push({ room: r, score });
           }
         }
+
+        if (candidates.length === 0) {
+          skipped++;
+          continue;
+        }
+
+        candidates.sort((a, b) => a.score - b.score);
+        const slot = candidates[0].room.slots.find((s) => !s.participant)!;
+        slot.participant = p;
+        placed++;
       }
+
+      if (skipped > 0) {
+        toast.warning(`${placed} assigned · ${skipped} couldn't be placed (rule conflicts)`, {
+          action: { label: "Undo", onClick: () => setBuildings(snapshot) },
+          duration: 6000,
+        });
+      } else {
+        toast.success(`${placed} participant${placed !== 1 ? "s" : ""} assigned`, {
+          action: { label: "Undo", onClick: () => setBuildings(snapshot) },
+          duration: 5000,
+        });
+      }
+
       return next;
-    });
-    toast.success(`${unassigned.length} participant(s) auto-assigned`, {
-      action: { label: "Undo", onClick: () => setBuildings(snapshot) },
-      duration: 5000,
     });
   }
 
-  function handleAddLateArrival(name: string, isVip: boolean, isPmr: boolean) {
+  function handleAddLateArrival(name: string, isVip: boolean, isAccessibility: boolean) {
     const newP: Participant = {
       id: `p-late-${Date.now()}`,
       name,
       isVip: isVip || undefined,
-      isPmr: isPmr || undefined,
+      isAccessibility: isAccessibility || undefined,
       isLateArrival: true,
     };
     setParticipants((prev) => [...prev, newP]);
@@ -250,7 +312,7 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
             Start over
           </button>
           <button
-            onClick={handleAutoAssign}
+            onClick={() => setShowAutoAssignModal(true)}
             className="flex items-center gap-1.5 text-sm bg-slate-800 text-white rounded-md px-3 py-1.5 hover:bg-slate-700 transition-colors"
           >
             <Shuffle size={13} />
@@ -355,6 +417,73 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         assignedIds={assignedIds}
         onAssign={handleModalAssign}
       />
+
+      {/* Auto-assign modal */}
+      <Dialog open={showAutoAssignModal} onOpenChange={(v) => !v && setShowAutoAssignModal(false)}>
+        <DialogContent className="w-[420px] max-w-[420px] p-0 gap-0">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b border-gray-100">
+            <DialogTitle className="text-base font-bold text-slate-800">Auto-assign</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 py-4 flex flex-col gap-1">
+            <p className="text-sm text-gray-500 mb-3">
+              Select the rules to apply when assigning participants to rooms.
+            </p>
+            {[
+              {
+                key: "noGenderMix" as const,
+                label: "No gender mixing",
+                description: "Participants in the same room must be the same gender.",
+              },
+              {
+                key: "vipAlone" as const,
+                label: "VIP in premium rooms only",
+                description:
+                  "VIP participants are placed in VIP-only rooms. Non-VIPs are excluded from those rooms.",
+              },
+              {
+                key: "accessibilityFirstFloor" as const,
+                label: "Accessibility needs → floor 1",
+                description:
+                  "Participants with accessibility needs are assigned to ground-floor rooms first.",
+              },
+            ].map(({ key, label, description }) => (
+              <label
+                key={key}
+                className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0 cursor-pointer select-none group"
+              >
+                <input
+                  type="checkbox"
+                  checked={rules[key]}
+                  onChange={(e) => setRules((r) => ({ ...r, [key]: e.target.checked }))}
+                  className="mt-0.5 rounded accent-slate-800 shrink-0"
+                />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 px-5 pb-5">
+            <button
+              onClick={() => setShowAutoAssignModal(false)}
+              className="text-sm px-3 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowAutoAssignModal(false);
+                handleAutoAssign();
+              }}
+              className="flex items-center gap-1.5 text-sm px-4 py-1.5 bg-slate-800 text-white rounded-md hover:bg-slate-700 transition-colors"
+            >
+              <Shuffle size={13} />
+              Assign
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={showStartOverConfirm}

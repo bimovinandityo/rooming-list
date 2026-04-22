@@ -86,7 +86,7 @@ export function RoomRow({
                   VIP
                 </span>
               )}
-              {slot.participant.isPmr && (
+              {slot.participant.isAccessibility && (
                 <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
                   PMR
                 </span>

@@ -227,12 +227,12 @@ export function GestionDesChambres() {
     );
   }
 
-  function handleAddLateArrival(name: string, isVip: boolean, isPmr: boolean) {
+  function handleAddLateArrival(name: string, isVip: boolean, isAccessibility: boolean) {
     const newP: Participant = {
       id: `p-late-${Date.now()}`,
       name,
       isVip: isVip || undefined,
-      isPmr: isPmr || undefined,
+      isAccessibility: isAccessibility || undefined,
       isLateArrival: true,
     };
     setParticipants((prev) => [...prev, newP]);

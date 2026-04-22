@@ -14,7 +14,7 @@ interface ParticipantDrawerProps {
   onDragEnd: () => void;
   onAssign: (participant: Participant) => void;
   onMarkLate: (id: string) => void;
-  onAddLateArrival: (name: string, isVip: boolean, isPmr: boolean) => void;
+  onAddLateArrival: (name: string, isVip: boolean, isAccessibility: boolean) => void;
   onUnassignDrop: () => void;
 }
 
@@ -46,7 +46,9 @@ export function ParticipantDrawer({
     return list.filter((p) => {
       const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
       const matchesFilter =
-        filter === "all" || (filter === "vip" && p.isVip) || (filter === "pmr" && p.isPmr);
+        filter === "all" ||
+        (filter === "vip" && p.isVip) ||
+        (filter === "pmr" && p.isAccessibility);
       return matchesSearch && matchesFilter;
     });
   }
@@ -285,7 +287,7 @@ function DrawerRow({
               VIP
             </span>
           )}
-          {participant.isPmr && (
+          {participant.isAccessibility && (
             <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
               PMR
             </span>
