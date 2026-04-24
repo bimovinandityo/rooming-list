@@ -6,6 +6,10 @@ export interface Participant {
   isAccessibility?: boolean;
   isLateArrival?: boolean;
   avatarUrl?: string;
+  checkInDate?: string; // "YYYY-MM-DD"
+  checkOutDate?: string; // "YYYY-MM-DD"
+  isEarlyCheckIn?: boolean;
+  isLateCheckOut?: boolean;
 }
 
 export interface RoomSlot {

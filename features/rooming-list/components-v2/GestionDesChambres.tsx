@@ -6,6 +6,7 @@ import { Shuffle, RotateCcw, X } from "lucide-react";
 import { RoomListView } from "./RoomListView";
 import { ParticipantDrawer } from "./ParticipantDrawer";
 import { AssignParticipantModal } from "./AssignParticipantModal";
+import { ManifestView } from "./ManifestView";
 import { mockBuildings, mockParticipants } from "../mock/data";
 import { cn } from "@/shared/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -31,6 +32,7 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   );
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
   const [targetSlot, setTargetSlot] = useState<{ roomId: string; slotId: string } | null>(null);
+  const [activeView, setActiveView] = useState<"rooms" | "manifest">("rooms");
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [showBuilderBanner, setShowBuilderBanner] = useState(true);
   const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
@@ -280,6 +282,10 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
     });
   }
 
+  function handleUpdateParticipant(id: string, updates: Partial<Participant>) {
+    setParticipants((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+  }
+
   function handleAddLateArrival(name: string, isVip: boolean, isAccessibility: boolean) {
     const newP: Participant = {
       id: `p-late-${Date.now()}`,
@@ -295,30 +301,47 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-        {!hideTitle && (
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
-            <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
+        <div className="flex items-center gap-1">
+          {!hideTitle && (
+            <div className="flex items-center gap-2.5 mr-4">
+              <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
+              <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
+            </div>
+          )}
+          {(["rooms", "manifest"] as const).map((view) => (
+            <button
+              key={view}
+              onClick={() => setActiveView(view)}
+              className={cn(
+                "text-sm px-3 py-1.5 rounded-md font-medium transition-colors",
+                activeView === view
+                  ? "bg-slate-100 text-slate-800"
+                  : "text-gray-400 hover:text-gray-700",
+              )}
+            >
+              {view === "rooms" ? "Rooms" : "Check-in / Check-out"}
+            </button>
+          ))}
+        </div>
+        {activeView === "rooms" && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleStartOver}
+              className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+            >
+              <RotateCcw size={13} />
+              Start over
+            </button>
+            <button
+              onClick={() => setShowAutoAssignModal(true)}
+              className="flex items-center gap-1.5 text-sm bg-slate-800 text-white rounded-md px-3 py-1.5 hover:bg-slate-700 transition-colors"
+            >
+              <Shuffle size={13} />
+              Auto-assign
+            </button>
           </div>
         )}
-        {hideTitle && <div />}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleStartOver}
-            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
-          >
-            <RotateCcw size={13} />
-            Start over
-          </button>
-          <button
-            onClick={() => setShowAutoAssignModal(true)}
-            className="flex items-center gap-1.5 text-sm bg-slate-800 text-white rounded-md px-3 py-1.5 hover:bg-slate-700 transition-colors"
-          >
-            <Shuffle size={13} />
-            Auto-assign
-          </button>
-        </div>
       </div>
 
       {/* Builder source banner */}
@@ -345,70 +368,82 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         </div>
       )}
 
-      {/* Filter + stats row */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-gray-100">
-        <div className="flex items-center gap-0.5">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setRoomFilter(f.key)}
+      {activeView === "rooms" && (
+        <>
+          {/* Filter + stats row */}
+          <div className="flex items-center justify-between px-6 py-2 border-b border-gray-100">
+            <div className="flex items-center gap-0.5">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setRoomFilter(f.key)}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-full font-medium transition-colors",
+                    roomFilter === f.key
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-500 hover:text-gray-700",
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div
               className={cn(
-                "text-xs px-3 py-1.5 rounded-full font-medium transition-colors",
-                roomFilter === f.key
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-500 hover:text-gray-700",
+                "flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border",
+                unassignedCount === 0
+                  ? "border-green-200 bg-green-50 text-green-700"
+                  : "border-gray-200 bg-white text-gray-600",
               )}
             >
-              {f.label}
-            </button>
-          ))}
-        </div>
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full shrink-0",
+                  unassignedCount === 0 ? "bg-green-500" : "bg-red-500",
+                )}
+              />
+              {unassignedCount === 0 ? "All assigned ✓" : `${unassignedCount} unassigned`}
+            </div>
+          </div>
 
-        <div
-          className={cn(
-            "flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border",
-            unassignedCount === 0
-              ? "border-green-200 bg-green-50 text-green-700"
-              : "border-gray-200 bg-white text-gray-600",
-          )}
-        >
-          <span
-            className={cn(
-              "w-2 h-2 rounded-full shrink-0",
-              unassignedCount === 0 ? "bg-green-500" : "bg-red-500",
-            )}
-          />
-          {unassignedCount === 0 ? "All assigned ✓" : `${unassignedCount} unassigned`}
-        </div>
-      </div>
+          {/* Main content */}
+          <div className="flex flex-1 min-h-0 bg-gray-50">
+            <RoomListView
+              buildings={filteredBuildings}
+              draggingParticipant={draggingParticipant}
+              onRemove={handleRemove}
+              onSlotClick={handleSlotClick}
+              onDrop={handleDrop}
+              onChipDragStart={handleChipDragStart}
+              onDragEnd={handleDragEnd}
+            />
 
-      {/* Main content */}
-      <div className="flex flex-1 min-h-0 bg-gray-50">
-        <RoomListView
-          buildings={filteredBuildings}
-          draggingParticipant={draggingParticipant}
-          onRemove={handleRemove}
-          onSlotClick={handleSlotClick}
-          onDrop={handleDrop}
-          onChipDragStart={handleChipDragStart}
-          onDragEnd={handleDragEnd}
-        />
+            <ParticipantDrawer
+              participants={participants}
+              assignedIds={assignedIds}
+              draggingId={draggingId}
+              isRoomChipDragging={draggingSource !== null}
+              onDragStart={setDraggingId}
+              onDragEnd={handleDragEnd}
+              onAddLateArrival={handleAddLateArrival}
+              onUnassignDrop={() => {
+                if (!draggingSource) return;
+                handleRemove(draggingSource.roomId, draggingSource.slotId);
+                handleDragEnd();
+              }}
+            />
+          </div>
+        </>
+      )}
 
-        <ParticipantDrawer
+      {activeView === "manifest" && (
+        <ManifestView
           participants={participants}
-          assignedIds={assignedIds}
-          draggingId={draggingId}
-          isRoomChipDragging={draggingSource !== null}
-          onDragStart={setDraggingId}
-          onDragEnd={handleDragEnd}
-          onAddLateArrival={handleAddLateArrival}
-          onUnassignDrop={() => {
-            if (!draggingSource) return;
-            handleRemove(draggingSource.roomId, draggingSource.slotId);
-            handleDragEnd();
-          }}
+          buildings={buildings}
+          onUpdateParticipant={handleUpdateParticipant}
         />
-      </div>
+      )}
 
       <AssignParticipantModal
         open={!!targetSlot}
