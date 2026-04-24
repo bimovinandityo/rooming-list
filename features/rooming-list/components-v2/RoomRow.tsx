@@ -2,12 +2,27 @@
 
 import { X } from "lucide-react";
 import { cn } from "@/shared/utils";
+import { EVENT_CHECK_IN_DATE, EVENT_CHECK_OUT_DATE } from "../mock/data";
 import type { Room, Participant } from "../types";
+
+function isParticipantPresent(p: Participant, night: string): boolean {
+  const checkIn = p.checkInDate ?? EVENT_CHECK_IN_DATE;
+  const checkOut = p.checkOutDate ?? EVENT_CHECK_OUT_DATE;
+  return checkIn <= night && checkOut > night;
+}
+
+function shortDate(date: string) {
+  return new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 interface RoomRowProps {
   room: Room;
   draggingParticipant: Participant | null;
   isDropTarget: boolean;
+  selectedNight: string | null;
   onRemove: (slotId: string) => void;
   onSlotClick: (slotId: string) => void;
   onDrop: (slotId: string) => void;
@@ -21,6 +36,7 @@ export function RoomRow({
   room,
   draggingParticipant,
   isDropTarget,
+  selectedNight,
   onRemove,
   onSlotClick,
   onDrop,
@@ -54,9 +70,12 @@ export function RoomRow({
       {/* Room name */}
       <div className="w-44 shrink-0">
         <div className="text-sm font-medium text-slate-800">{room.name}</div>
-        {room.privateBathroom && (
-          <div className="text-[11px] text-gray-400 mt-0.5">Private bathroom</div>
-        )}
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] text-gray-400">Floor {room.floor}</span>
+          {room.privateBathroom && (
+            <span className="text-[11px] text-gray-400">· Private bathroom</span>
+          )}
+        </div>
       </div>
 
       {/* Bed description */}
@@ -66,56 +85,112 @@ export function RoomRow({
 
       {/* Participant chips + empty slots */}
       <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 py-1">
-        {room.slots.map((slot) =>
-          slot.participant ? (
+        {room.slots.map((slot) => {
+          if (!slot.participant) {
+            return (
+              <button
+                key={slot.id}
+                onClick={() => onSlotClick(slot.id)}
+                className={cn(
+                  "flex items-center border border-dashed rounded px-3 py-1 text-xs transition-colors",
+                  isDropTarget && draggingParticipant
+                    ? "border-blue-400 text-blue-500 bg-blue-50"
+                    : "border-gray-300 text-gray-400 hover:border-slate-400 hover:text-slate-500",
+                )}
+              >
+                Empty
+              </button>
+            );
+          }
+
+          const p = slot.participant;
+          const absent = selectedNight !== null && !isParticipantPresent(p, selectedNight);
+          const arrivingLater =
+            absent && (p.checkInDate ?? EVENT_CHECK_IN_DATE) > (selectedNight ?? "");
+          const leftAlready = absent && !arrivingLater;
+
+          const nonStandardCheckIn = p.checkInDate && p.checkInDate !== EVENT_CHECK_IN_DATE;
+          const nonStandardCheckOut = p.checkOutDate && p.checkOutDate !== EVENT_CHECK_OUT_DATE;
+
+          const checkIn = p.checkInDate ?? EVENT_CHECK_IN_DATE;
+          const checkOut = p.checkOutDate ?? EVENT_CHECK_OUT_DATE;
+          const nonStandard = nonStandardCheckIn || nonStandardCheckOut;
+
+          return (
             <div
               key={slot.id}
-              draggable
-              onDragStart={() => onChipDragStart(slot.participant!.id, slot.id)}
+              draggable={!absent}
+              onDragStart={() => !absent && onChipDragStart(p.id, slot.id)}
               onDragEnd={onDragEnd}
               className={cn(
-                "group flex items-center gap-1.5 bg-gray-100 border border-gray-200 rounded px-2.5 py-1 text-sm text-slate-700 select-none cursor-grab active:cursor-grabbing transition-opacity",
-                draggingParticipant?.id === slot.participant.id && "opacity-40",
+                "group flex flex-col rounded px-2.5 py-1.5 select-none transition-all",
+                absent
+                  ? "border border-dashed border-gray-200 bg-gray-50 text-gray-300 cursor-default"
+                  : "bg-gray-100 border border-gray-200 text-slate-700 cursor-grab active:cursor-grabbing",
+                !absent && draggingParticipant?.id === p.id && "opacity-40",
               )}
             >
-              {slot.participant.isVip && (
-                <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded leading-none">
-                  VIP
+              {/* Line 1: name + remove */}
+              <div className="flex items-center gap-1.5">
+                <span className={cn("text-sm leading-tight", absent && "line-through")}>
+                  {p.name}
+                </span>
+                {!absent && (
+                  <button
+                    onClick={() => onRemove(slot.id)}
+                    className="opacity-0 group-hover:opacity-100 ml-0.5 text-gray-400 hover:text-gray-700 transition-opacity shrink-0"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+              {/* Line 2: badges + CI→CO dates (matches drawer row) */}
+              {!absent && (
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                  {p.isVip && (
+                    <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded leading-none">
+                      VIP
+                    </span>
+                  )}
+                  {p.isAccessibility && (
+                    <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
+                      ♿
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "text-[10px] leading-none",
+                      nonStandard ? "text-amber-600 font-medium" : "text-gray-400",
+                    )}
+                  >
+                    {shortDate(checkIn)} → {shortDate(checkOut)}
+                  </span>
+                  {p.isEarlyCheckIn && checkIn === EVENT_CHECK_IN_DATE && (
+                    <span className="text-[9px] font-medium bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded leading-none">
+                      Early in
+                    </span>
+                  )}
+                  {p.isLateCheckOut && checkOut === EVENT_CHECK_OUT_DATE && (
+                    <span className="text-[9px] font-medium bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded leading-none">
+                      Late out
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* Per-night absence reason */}
+              {arrivingLater && (
+                <span className="text-[9px] font-medium bg-orange-50 text-orange-400 px-1.5 py-0.5 rounded leading-none mt-0.5">
+                  arrives {shortDate(p.checkInDate ?? EVENT_CHECK_IN_DATE)}
                 </span>
               )}
-              {slot.participant.isAccessibility && (
-                <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
-                  PMR
+              {leftAlready && (
+                <span className="text-[9px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded leading-none mt-0.5">
+                  left {shortDate(p.checkOutDate ?? EVENT_CHECK_OUT_DATE)}
                 </span>
               )}
-              {slot.participant.isLateArrival && (
-                <span className="text-[9px] font-bold bg-orange-100 text-orange-700 px-1 py-0.5 rounded leading-none">
-                  Late
-                </span>
-              )}
-              <span>{slot.participant.name}</span>
-              <button
-                onClick={() => onRemove(slot.id)}
-                className="opacity-0 group-hover:opacity-100 ml-0.5 text-gray-400 hover:text-gray-700 transition-opacity"
-              >
-                <X size={11} />
-              </button>
             </div>
-          ) : (
-            <button
-              key={slot.id}
-              onClick={() => onSlotClick(slot.id)}
-              className={cn(
-                "flex items-center border border-dashed rounded px-3 py-1 text-xs transition-colors",
-                isDropTarget && draggingParticipant
-                  ? "border-blue-400 text-blue-500 bg-blue-50"
-                  : "border-gray-300 text-gray-400 hover:border-slate-400 hover:text-slate-500",
-              )}
-            >
-              Empty
-            </button>
-          ),
-        )}
+          );
+        })}
       </div>
     </div>
   );

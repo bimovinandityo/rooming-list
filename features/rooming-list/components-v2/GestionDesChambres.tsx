@@ -6,33 +6,27 @@ import { Shuffle, RotateCcw, X } from "lucide-react";
 import { RoomListView } from "./RoomListView";
 import { ParticipantDrawer } from "./ParticipantDrawer";
 import { AssignParticipantModal } from "./AssignParticipantModal";
-import { ManifestView } from "./ManifestView";
-import { mockBuildings, mockParticipants } from "../mock/data";
+import {
+  mockBuildings,
+  mockParticipants,
+  EVENT_CHECK_IN_DATE,
+  EVENT_CHECK_OUT_DATE,
+} from "../mock/data";
 import { cn } from "@/shared/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { useRoomingList } from "../context/RoomingListContext";
 import type { Building, Participant } from "../types";
 
-type RoomFilter = "all" | "incomplete" | "full";
-
-const FILTERS: { key: RoomFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "incomplete", label: "Incomplete" },
-  { key: "full", label: "Full" },
-];
-
 export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean }) {
   const { publishedBuildings, publishedAt } = useRoomingList();
 
   const [buildings, setBuildings] = useState<Building[]>(() => publishedBuildings ?? mockBuildings);
-  const [participants, setParticipants] = useState<Participant[]>(mockParticipants);
+  const participants = mockParticipants;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingSource, setDraggingSource] = useState<{ roomId: string; slotId: string } | null>(
     null,
   );
-  const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
   const [targetSlot, setTargetSlot] = useState<{ roomId: string; slotId: string } | null>(null);
-  const [activeView, setActiveView] = useState<"rooms" | "manifest">("rooms");
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [showBuilderBanner, setShowBuilderBanner] = useState(true);
   const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
@@ -40,6 +34,8 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
     noGenderMix: true,
     vipAlone: true,
     accessibilityFirstFloor: true,
+    includeEarlyCiLateCo: true,
+    includeIrregularDates: true,
   });
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -57,17 +53,6 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
 
   const allRooms = buildings.flatMap((b) => b.rooms);
   const unassignedCount = participants.length - assignedIds.size;
-
-  const filteredBuildings = buildings.map((b) => ({
-    ...b,
-    rooms: b.rooms.filter((r) => {
-      const filled = r.slots.filter((s) => s.participant).length;
-      const total = r.slots.length;
-      if (roomFilter === "incomplete") return filled < total;
-      if (roomFilter === "full") return filled === total;
-      return true;
-    }),
-  }));
 
   // ── Actions ───────────────────────────────────────────────────────────────────
   const assignToSlot = useCallback((roomId: string, slotId: string, participant: Participant) => {
@@ -199,12 +184,33 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   }
 
   function handleAutoAssign() {
-    const unassigned = participants.filter((p) => !assignedIds.has(p.id));
-    if (!unassigned.length) {
+    const allUnassigned = participants.filter((p) => !assignedIds.has(p.id));
+    if (!allUnassigned.length) {
       toast.info("All participants are already assigned");
       return;
     }
     const snapshot = buildings;
+
+    function hasEarlyCiLateCo(p: Participant) {
+      const onStandardIn = (p.checkInDate ?? EVENT_CHECK_IN_DATE) === EVENT_CHECK_IN_DATE;
+      const onStandardOut = (p.checkOutDate ?? EVENT_CHECK_OUT_DATE) === EVENT_CHECK_OUT_DATE;
+      return (p.isEarlyCheckIn && onStandardIn) || (p.isLateCheckOut && onStandardOut);
+    }
+
+    function hasIrregularDates(p: Participant) {
+      return (
+        (p.checkInDate && p.checkInDate !== EVENT_CHECK_IN_DATE) ||
+        (p.checkOutDate && p.checkOutDate !== EVENT_CHECK_OUT_DATE)
+      );
+    }
+
+    const unassigned = allUnassigned.filter((p) => {
+      if (!rules.includeEarlyCiLateCo && hasEarlyCiLateCo(p)) return false;
+      if (!rules.includeIrregularDates && hasIrregularDates(p)) return false;
+      return true;
+    });
+
+    const skippedByFilter = allUnassigned.length - unassigned.length;
 
     // Sort: accessibility first, then VIP, then regular
     const sorted = [...unassigned].sort((a, b) => {
@@ -266,13 +272,17 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         placed++;
       }
 
+      const filterMsg = skippedByFilter > 0 ? ` · ${skippedByFilter} skipped (filter)` : "";
       if (skipped > 0) {
-        toast.warning(`${placed} assigned · ${skipped} couldn't be placed (rule conflicts)`, {
-          action: { label: "Undo", onClick: () => setBuildings(snapshot) },
-          duration: 6000,
-        });
+        toast.warning(
+          `${placed} assigned · ${skipped} couldn't be placed (rule conflicts)${filterMsg}`,
+          {
+            action: { label: "Undo", onClick: () => setBuildings(snapshot) },
+            duration: 6000,
+          },
+        );
       } else {
-        toast.success(`${placed} participant${placed !== 1 ? "s" : ""} assigned`, {
+        toast.success(`${placed} participant${placed !== 1 ? "s" : ""} assigned${filterMsg}`, {
           action: { label: "Undo", onClick: () => setBuildings(snapshot) },
           duration: 5000,
         });
@@ -282,66 +292,33 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
     });
   }
 
-  function handleUpdateParticipant(id: string, updates: Partial<Participant>) {
-    setParticipants((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-  }
-
-  function handleAddLateArrival(name: string, isVip: boolean, isAccessibility: boolean) {
-    const newP: Participant = {
-      id: `p-late-${Date.now()}`,
-      name,
-      isVip: isVip || undefined,
-      isAccessibility: isAccessibility || undefined,
-      isLateArrival: true,
-    };
-    setParticipants((prev) => [...prev, newP]);
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
-        <div className="flex items-center gap-1">
-          {!hideTitle && (
-            <div className="flex items-center gap-2.5 mr-4">
-              <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
-              <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
-            </div>
-          )}
-          {(["rooms", "manifest"] as const).map((view) => (
-            <button
-              key={view}
-              onClick={() => setActiveView(view)}
-              className={cn(
-                "text-sm px-3 py-1.5 rounded-md font-medium transition-colors",
-                activeView === view
-                  ? "bg-slate-100 text-slate-800"
-                  : "text-gray-400 hover:text-gray-700",
-              )}
-            >
-              {view === "rooms" ? "Rooms" : "Check-in / Check-out"}
-            </button>
-          ))}
-        </div>
-        {activeView === "rooms" && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleStartOver}
-              className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
-            >
-              <RotateCcw size={13} />
-              Start over
-            </button>
-            <button
-              onClick={() => setShowAutoAssignModal(true)}
-              className="flex items-center gap-1.5 text-sm bg-slate-800 text-white rounded-md px-3 py-1.5 hover:bg-slate-700 transition-colors"
-            >
-              <Shuffle size={13} />
-              Auto-assign
-            </button>
+        {!hideTitle && (
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
+            <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
           </div>
         )}
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={handleStartOver}
+            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+          >
+            <RotateCcw size={13} />
+            Start over
+          </button>
+          <button
+            onClick={() => setShowAutoAssignModal(true)}
+            className="flex items-center gap-1.5 text-sm bg-slate-800 text-white rounded-md px-3 py-1.5 hover:bg-slate-700 transition-colors"
+          >
+            <Shuffle size={13} />
+            Auto-assign
+          </button>
+        </div>
       </div>
 
       {/* Builder source banner */}
@@ -368,27 +345,10 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         </div>
       )}
 
-      {activeView === "rooms" && (
-        <>
-          {/* Filter + stats row */}
-          <div className="flex items-center justify-between px-6 py-2 border-b border-gray-100">
-            <div className="flex items-center gap-0.5">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setRoomFilter(f.key)}
-                  className={cn(
-                    "text-xs px-3 py-1.5 rounded-full font-medium transition-colors",
-                    roomFilter === f.key
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-500 hover:text-gray-700",
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
+      <>
+        {/* Stats row */}
+        <div className="flex items-center px-6 py-2 border-b border-gray-100">
+          <div className="ml-auto flex items-center">
             <div
               className={cn(
                 "flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border",
@@ -406,44 +366,36 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
               {unassignedCount === 0 ? "All assigned ✓" : `${unassignedCount} unassigned`}
             </div>
           </div>
+        </div>
 
-          {/* Main content */}
-          <div className="flex flex-1 min-h-0 bg-gray-50">
-            <RoomListView
-              buildings={filteredBuildings}
-              draggingParticipant={draggingParticipant}
-              onRemove={handleRemove}
-              onSlotClick={handleSlotClick}
-              onDrop={handleDrop}
-              onChipDragStart={handleChipDragStart}
-              onDragEnd={handleDragEnd}
-            />
+        {/* Main content */}
+        <div className="flex flex-1 min-h-0 bg-gray-50">
+          <RoomListView
+            buildings={buildings}
+            draggingParticipant={draggingParticipant}
+            selectedNight={null}
+            onRemove={handleRemove}
+            onSlotClick={handleSlotClick}
+            onDrop={handleDrop}
+            onChipDragStart={handleChipDragStart}
+            onDragEnd={handleDragEnd}
+          />
 
-            <ParticipantDrawer
-              participants={participants}
-              assignedIds={assignedIds}
-              draggingId={draggingId}
-              isRoomChipDragging={draggingSource !== null}
-              onDragStart={setDraggingId}
-              onDragEnd={handleDragEnd}
-              onAddLateArrival={handleAddLateArrival}
-              onUnassignDrop={() => {
-                if (!draggingSource) return;
-                handleRemove(draggingSource.roomId, draggingSource.slotId);
-                handleDragEnd();
-              }}
-            />
-          </div>
-        </>
-      )}
-
-      {activeView === "manifest" && (
-        <ManifestView
-          participants={participants}
-          buildings={buildings}
-          onUpdateParticipant={handleUpdateParticipant}
-        />
-      )}
+          <ParticipantDrawer
+            participants={participants}
+            assignedIds={assignedIds}
+            draggingId={draggingId}
+            isRoomChipDragging={draggingSource !== null}
+            onDragStart={setDraggingId}
+            onDragEnd={handleDragEnd}
+            onUnassignDrop={() => {
+              if (!draggingSource) return;
+              handleRemove(draggingSource.roomId, draggingSource.slotId);
+              handleDragEnd();
+            }}
+          />
+        </div>
+      </>
 
       <AssignParticipantModal
         open={!!targetSlot}
@@ -480,6 +432,18 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
                 label: "Accessibility needs → floor 1",
                 description:
                   "Participants with accessibility needs are assigned to ground-floor rooms first.",
+              },
+              {
+                key: "includeEarlyCiLateCo" as const,
+                label: "Include early CI / late CO",
+                description:
+                  "Include participants with early check-in or late check-out time requests.",
+              },
+              {
+                key: "includeIrregularDates" as const,
+                label: "Include irregular dates",
+                description:
+                  "Include participants whose check-in or check-out date differs from the event dates.",
               },
             ].map(({ key, label, description }) => (
               <label

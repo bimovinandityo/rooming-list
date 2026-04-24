@@ -1,9 +1,28 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { GripVertical, UserPlus } from "lucide-react";
+import { useState } from "react";
+import { GripVertical, ChevronDown } from "lucide-react";
 import { cn } from "@/shared/utils";
+import { EVENT_CHECK_IN_DATE, EVENT_CHECK_OUT_DATE } from "../mock/data";
 import type { Participant } from "../types";
+
+function fmt(date: string) {
+  return new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function irregularityScore(p: Participant) {
+  let score = 0;
+  if (p.checkInDate && p.checkInDate !== EVENT_CHECK_IN_DATE) score += 2;
+  if (p.checkOutDate && p.checkOutDate !== EVENT_CHECK_OUT_DATE) score += 2;
+  if (p.isEarlyCheckIn && (p.checkInDate ?? EVENT_CHECK_IN_DATE) === EVENT_CHECK_IN_DATE)
+    score += 1;
+  if (p.isLateCheckOut && (p.checkOutDate ?? EVENT_CHECK_OUT_DATE) === EVENT_CHECK_OUT_DATE)
+    score += 1;
+  return score;
+}
 
 interface ParticipantDrawerProps {
   participants: Participant[];
@@ -12,7 +31,6 @@ interface ParticipantDrawerProps {
   isRoomChipDragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
-  onAddLateArrival: (name: string, isVip: boolean, isAccessibility: boolean) => void;
   onUnassignDrop: () => void;
 }
 
@@ -23,52 +41,41 @@ export function ParticipantDrawer({
   isRoomChipDragging,
   onDragStart,
   onDragEnd,
-  onAddLateArrival,
   onUnassignDrop,
 }: ParticipantDrawerProps) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "vip" | "accessibility">("all");
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newVip, setNewVip] = useState(false);
-  const [newAccessibility, setNewAccessibility] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [isOver, setIsOver] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
+    timing: true,
+    dates: true,
+  });
+  const [activeFilter, setActiveFilter] = useState<"all" | "vip" | "pmr">("all");
 
   const unassigned = participants.filter((p) => !assignedIds.has(p.id));
-  const regular = unassigned.filter((p) => !p.isLateArrival);
-  const lateArrivals = unassigned.filter((p) => p.isLateArrival);
 
-  function applyFilter(list: Participant[]) {
-    return list.filter((p) => {
-      const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "vip" && p.isVip) ||
-        (filter === "accessibility" && p.isAccessibility);
-      return matchesSearch && matchesFilter;
-    });
+  const filtered = unassigned.filter((p) => {
+    if (activeFilter === "vip") return !!p.isVip;
+    if (activeFilter === "pmr") return !!p.isAccessibility;
+    return true;
+  });
+
+  const searched = !search
+    ? filtered
+    : filtered.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const regular = searched.filter((p) => irregularityScore(p) === 0);
+  const timing = searched.filter((p) => irregularityScore(p) === 1);
+  const nonStandard = searched.filter((p) => irregularityScore(p) >= 2);
+
+  const sections = [
+    { key: "regular", label: "Regular dates", items: regular },
+    { key: "timing", label: "Early CI / Late CO", items: timing },
+    { key: "dates", label: "Irregular dates", items: nonStandard },
+  ].filter((s) => s.items.length > 0);
+
+  function toggleSection(key: string) {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
   }
-
-  const filteredRegular = applyFilter(regular);
-  const filteredLate = applyFilter(lateArrivals);
-  const isEmpty = filteredRegular.length === 0 && filteredLate.length === 0 && !showAddForm;
-
-  function handleAddSubmit() {
-    const name = newName.trim();
-    if (!name) return;
-    onAddLateArrival(name, newVip, newAccessibility);
-    setNewName("");
-    setNewVip(false);
-    setNewAccessibility(false);
-    setShowAddForm(false);
-  }
-
-  function openAddForm() {
-    setShowAddForm(true);
-    setTimeout(() => nameInputRef.current?.focus(), 50);
-  }
-
-  const [isOver, setIsOver] = useState(false);
 
   return (
     <div
@@ -102,139 +109,159 @@ export function ParticipantDrawer({
           </div>
         </div>
       )}
+
       {/* Header */}
-      <div className="px-4 py-3.5 border-b border-gray-100">
-        <p className="text-sm font-semibold text-slate-800">Unassigned</p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          {unassigned.length} participant{unassigned.length !== 1 ? "s" : ""}
-        </p>
+      <div className="px-4 py-3.5 border-b border-gray-100 flex items-start justify-between shrink-0">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Unassigned</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {unassigned.length} participant{unassigned.length !== 1 ? "s" : ""}
+          </p>
+        </div>
       </div>
 
-      {/* Search + filter */}
-      <div className="px-3 py-3 border-b border-gray-100 flex flex-col gap-2">
+      {/* VIP / PMR filter tabs */}
+      <div className="px-3 pt-2.5 pb-0 border-b border-gray-100 shrink-0 flex items-center gap-1">
+        {(["all", "vip", "pmr"] as const).map((f) => {
+          const label = f === "all" ? "All" : f === "vip" ? "VIP" : "PMR";
+          const count =
+            f === "all"
+              ? unassigned.length
+              : f === "vip"
+                ? unassigned.filter((p) => p.isVip).length
+                : unassigned.filter((p) => p.isAccessibility).length;
+          return (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className={cn(
+                "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-t border-b-2 transition-colors",
+                activeFilter === f
+                  ? "border-slate-700 text-slate-800 font-semibold"
+                  : "border-transparent text-gray-400 hover:text-slate-600",
+              )}
+            >
+              {label}
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums",
+                  activeFilter === f ? "text-slate-600" : "text-gray-300",
+                )}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search */}
+      <div className="px-3 py-2.5 border-b border-gray-100 shrink-0">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search…"
           className="w-full text-sm border border-gray-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400 transition-colors"
         />
-        <div className="flex gap-1.5">
-          {(["all", "vip", "accessibility"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={cn(
-                "text-xs px-3 py-1 rounded border font-medium transition-colors",
-                filter === f
-                  ? "bg-slate-800 text-white border-slate-800"
-                  : "border-gray-200 text-gray-500 hover:border-gray-300",
-              )}
-            >
-              {f === "all" ? "All" : f === "vip" ? "VIP" : "Accessibility"}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Regular participants */}
-        {filteredRegular.map((p) => (
-          <DrawerRow
-            key={p.id}
-            participant={p}
-            isDragging={draggingId === p.id}
-            onDragStart={() => onDragStart(p.id)}
-            onDragEnd={onDragEnd}
-          />
-        ))}
+      {/* Scrollable regular section */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {unassigned.length === 0 && (
+          <div className="p-6 text-center text-sm text-gray-400">All participants assigned ✓</div>
+        )}
+        {unassigned.length > 0 && sections.every((s) => s.key !== "regular") && (
+          <div className="p-6 text-center text-sm text-gray-400">No results</div>
+        )}
 
-        {/* Late arrivals section */}
-        <div className="flex items-center justify-between px-3 py-2 bg-orange-50 border-y border-orange-100 mt-1">
-          <span className="text-xs font-medium text-orange-600">
-            Late arrivals
-            {lateArrivals.length > 0 && (
-              <span className="ml-1.5 text-orange-400 font-normal">({lateArrivals.length})</span>
-            )}
-          </span>
-          <button
-            onClick={openAddForm}
-            className="flex items-center gap-1 text-[11px] text-orange-600 hover:text-orange-800 font-medium transition-colors"
-          >
-            <UserPlus size={11} />
-            Add
-          </button>
-        </div>
-
-        {/* Add late arrival form */}
-        {showAddForm && (
-          <div className="px-3 py-3 border-b border-orange-100 bg-orange-50/50 flex flex-col gap-2">
-            <input
-              ref={nameInputRef}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddSubmit();
-                if (e.key === "Escape") setShowAddForm(false);
-              }}
-              placeholder="Full name…"
-              className="w-full text-sm border border-orange-200 rounded-md px-3 py-1.5 outline-none focus:border-orange-400 bg-white transition-colors"
-            />
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={newVip}
-                  onChange={(e) => setNewVip(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="font-bold text-yellow-700">VIP</span>
-              </label>
-              <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={newAccessibility}
-                  onChange={(e) => setNewAccessibility(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="font-bold text-blue-700">Accessibility</span>
-              </label>
-              <div className="flex gap-1.5 ml-auto">
+        {sections
+          .filter((s) => s.key === "regular")
+          .map((section) => {
+            const isCollapsed = !!collapsed[section.key];
+            return (
+              <div key={section.key}>
                 <button
-                  onClick={() => setShowAddForm(false)}
-                  className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 transition-colors"
+                  onClick={() => toggleSection(section.key)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 hover:bg-gray-100 transition-colors"
                 >
-                  Cancel
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                    {section.label}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-gray-400 tabular-nums">
+                      {section.items.length}
+                    </span>
+                    <ChevronDown
+                      size={11}
+                      className={cn(
+                        "text-gray-300 transition-transform duration-150",
+                        isCollapsed && "-rotate-90",
+                      )}
+                    />
+                  </div>
                 </button>
-                <button
-                  onClick={handleAddSubmit}
-                  disabled={!newName.trim()}
-                  className="text-xs px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Add
-                </button>
+                {!isCollapsed &&
+                  section.items.map((p) => (
+                    <DrawerRow
+                      key={p.id}
+                      participant={p}
+                      isDragging={draggingId === p.id}
+                      onDragStart={() => onDragStart(p.id)}
+                      onDragEnd={onDragEnd}
+                    />
+                  ))}
               </div>
-            </div>
-          </div>
-        )}
-
-        {filteredLate.map((p) => (
-          <DrawerRow
-            key={p.id}
-            participant={p}
-            isDragging={draggingId === p.id}
-            onDragStart={() => onDragStart(p.id)}
-            onDragEnd={onDragEnd}
-            isLate
-          />
-        ))}
-
-        {isEmpty && (
-          <div className="p-6 text-center text-sm text-gray-400">
-            {unassigned.length === 0 ? "All participants are assigned ✓" : "No results"}
-          </div>
-        )}
+            );
+          })}
       </div>
+
+      {/* Pinned bottom: Early CI/CO + Irregular dates */}
+      {sections.filter((s) => s.key === "timing" || s.key === "dates").length > 0 && (
+        <div className="shrink-0 border-t border-gray-200">
+          {sections
+            .filter((s) => s.key === "timing" || s.key === "dates")
+            .map((section) => {
+              const isCollapsed = !!collapsed[section.key];
+              return (
+                <div key={section.key}>
+                  <button
+                    onClick={() => toggleSection(section.key)}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                      {section.label}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-gray-400 tabular-nums">
+                        {section.items.length}
+                      </span>
+                      <ChevronDown
+                        size={11}
+                        className={cn(
+                          "text-gray-300 transition-transform duration-150",
+                          isCollapsed && "-rotate-90",
+                        )}
+                      />
+                    </div>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="max-h-48 overflow-y-auto">
+                      {section.items.map((p) => (
+                        <DrawerRow
+                          key={p.id}
+                          participant={p}
+                          isDragging={draggingId === p.id}
+                          onDragStart={() => onDragStart(p.id)}
+                          onDragEnd={onDragEnd}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }
@@ -244,13 +271,11 @@ function DrawerRow({
   isDragging,
   onDragStart,
   onDragEnd,
-  isLate,
 }: {
   participant: Participant;
   isDragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
-  isLate?: boolean;
 }) {
   return (
     <div
@@ -263,10 +288,9 @@ function DrawerRow({
       )}
     >
       <GripVertical size={12} className="text-gray-300 shrink-0" />
-
       <div className="flex-1 min-w-0">
         <p className="text-sm text-slate-700 truncate">{participant.name}</p>
-        <div className="flex gap-1 mt-0.5">
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           {participant.isVip && (
             <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded leading-none">
               VIP
@@ -277,11 +301,30 @@ function DrawerRow({
               ♿
             </span>
           )}
-          {isLate && (
-            <span className="text-[9px] font-bold bg-orange-100 text-orange-700 px-1 py-0.5 rounded leading-none">
-              Late
-            </span>
-          )}
+          <span
+            className={cn(
+              "text-[10px] leading-none",
+              (participant.checkInDate && participant.checkInDate !== EVENT_CHECK_IN_DATE) ||
+                (participant.checkOutDate && participant.checkOutDate !== EVENT_CHECK_OUT_DATE)
+                ? "text-amber-600 font-medium"
+                : "text-gray-400",
+            )}
+          >
+            {fmt(participant.checkInDate ?? EVENT_CHECK_IN_DATE)} →{" "}
+            {fmt(participant.checkOutDate ?? EVENT_CHECK_OUT_DATE)}
+          </span>
+          {participant.isEarlyCheckIn &&
+            (participant.checkInDate ?? EVENT_CHECK_IN_DATE) === EVENT_CHECK_IN_DATE && (
+              <span className="text-[9px] font-medium bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded leading-none">
+                Early in
+              </span>
+            )}
+          {participant.isLateCheckOut &&
+            (participant.checkOutDate ?? EVENT_CHECK_OUT_DATE) === EVENT_CHECK_OUT_DATE && (
+              <span className="text-[9px] font-medium bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded leading-none">
+                Late out
+              </span>
+            )}
         </div>
       </div>
     </div>
