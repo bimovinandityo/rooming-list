@@ -185,32 +185,28 @@ export function NabooShell({
           ref={sidebarRef}
           className="w-[280px] shrink-0 border-r border-gray-100 overflow-y-auto flex flex-col bg-white"
         >
-          <div className="px-4 pt-5 pb-4">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
-              My advisor
-            </p>
+          <div className="px-5 pt-6 pb-5">
+            <p className="text-sm text-gray-400 mb-3">My advisor</p>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 shrink-0 mt-0.5">
+              <div className="w-11 h-11 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600 shrink-0">
                 AD
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900">Alexandre Dubois</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">06 35 58 45 69</p>
-                <p className="text-[11px] text-gray-500 truncate">alexandre.dubois@naboo.app</p>
+                <p className="text-xs text-gray-500 mt-0.5">06 35 58 45 69</p>
+                <p className="text-xs text-gray-500 truncate">alexandre.dubois@naboo.app</p>
               </div>
             </div>
-            <button className="mt-3 w-full text-sm border border-gray-200 rounded-md py-1.5 text-gray-600 hover:bg-gray-50 transition-colors">
+            <button className="mt-4 w-full text-sm border border-gray-200 rounded-md py-2 text-gray-700 hover:bg-gray-50 transition-colors">
               Book a meeting
             </button>
           </div>
 
-          <div className="border-t border-gray-100" />
-
-          <nav className="flex-1 py-3 px-2">
+          <nav className="flex-1 pb-4 px-3">
             {NAV_SECTIONS.map((section) => (
               <div key={section.title} className="mb-5">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-2 mb-1">
-                  {section.title}
+                <p className="text-sm text-gray-400 px-2 mb-2">
+                  {section.title.charAt(0) + section.title.slice(1).toLowerCase()}
                 </p>
                 {section.items.map((item) => {
                   const Icon = item.icon;
@@ -224,13 +220,13 @@ export function NabooShell({
 
                   const itemEl = (
                     <span
-                      className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                      className={`flex items-center gap-3 px-2 py-2 rounded-md text-sm transition-colors ${
                         isParentActive
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : "text-gray-600 hover:bg-gray-50"
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-700 hover:bg-gray-50"
                       }`}
                     >
-                      <Icon size={14} className="shrink-0" />
+                      <Icon size={16} className="shrink-0 text-gray-500" />
                       {item.label}
                     </span>
                   );
@@ -245,15 +241,15 @@ export function NabooShell({
                         <div className="w-full cursor-default">{itemEl}</div>
                       )}
                       {item.children && (
-                        <div className="ml-[26px] mt-0.5 mb-1">
+                        <div className="ml-[28px] mt-0.5 mb-1">
                           {item.children.map((child) => {
                             const isChildActive = child.activeKey === activeItem;
                             const childEl = (
                               <span
-                                className={`block text-sm px-2 py-1 rounded transition-colors ${
+                                className={`block text-sm px-2 py-1.5 rounded-md transition-colors ${
                                   isChildActive
-                                    ? "text-gray-900 font-medium"
-                                    : "text-gray-400 hover:text-gray-600"
+                                    ? "bg-gray-100 text-gray-900 font-medium"
+                                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                                 }`}
                               >
                                 {child.label}
