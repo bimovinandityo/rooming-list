@@ -1,7 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Pencil, Plus, BedDouble, Trash2, ImagePlus, X as XIcon, Shuffle } from "lucide-react";
+import {
+  Pencil,
+  Plus,
+  BedDouble,
+  Trash2,
+  ImagePlus,
+  X as XIcon,
+  Shuffle,
+  Upload,
+} from "lucide-react";
+import { importFromFile } from "../utils/importTemplates";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Switch } from "@/shared/ui/switch";
@@ -553,6 +563,40 @@ export function RoomingListBuilder() {
     null,
   );
   const [showParticipants, setShowParticipants] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportFile(file: File) {
+    try {
+      const { buildings: imported, warnings } = await importFromFile(file);
+      if (imported.length === 0) {
+        toast.error("No rooms found in file", {
+          description: warnings[0] ?? "Check that columns include building, name, and beds.",
+        });
+        return;
+      }
+      // Merge: append rooms into existing buildings (matched by name), or add new buildings.
+      setBuildings((prev) => {
+        const next = prev.map((b) => ({ ...b, rooms: [...b.rooms] }));
+        for (const incoming of imported) {
+          const match = next.find((b) => b.name.toLowerCase() === incoming.name.toLowerCase());
+          if (match) match.rooms.push(...incoming.rooms);
+          else next.push(incoming);
+        }
+        return next;
+      });
+      const totalImported = imported.reduce((s, b) => s + b.rooms.length, 0);
+      toast.success(`Imported ${totalImported} room${totalImported !== 1 ? "s" : ""}`, {
+        description:
+          warnings.length > 0
+            ? `${warnings.length} row${warnings.length !== 1 ? "s" : ""} skipped`
+            : undefined,
+      });
+    } catch (err) {
+      toast.error("Import failed", {
+        description: err instanceof Error ? err.message : "Couldn't read this file.",
+      });
+    }
+  }
 
   useEffect(() => {
     setTemplates(buildings);
@@ -668,6 +712,25 @@ export function RoomingListBuilder() {
           <span className="font-semibold text-gray-800">{totalBeds}</span> beds total
         </span>
         <div className="flex-1" />
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls,.numbers,.pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImportFile(file);
+            e.target.value = "";
+          }}
+        />
+        <button
+          onClick={() => importInputRef.current?.click()}
+          className="flex items-center gap-2 border border-gray-200 text-gray-600 text-sm font-medium px-3.5 py-2 rounded-md hover:bg-gray-50 transition-colors"
+          title="Import rooms from CSV or Excel"
+        >
+          <Upload size={14} />
+          Import
+        </button>
         <button
           onClick={() => {
             setAddModalKey((k) => k + 1);

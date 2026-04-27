@@ -30,7 +30,7 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [showBuilderBanner, setShowBuilderBanner] = useState(true);
   const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
-  const [roomFilter, setRoomFilter] = useState<"all" | "incomplete" | "full">("all");
+  const [selectedDay, setSelectedDay] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [roomSearch, setRoomSearch] = useState("");
   const [rules, setRules] = useState({
     noGenderMix: true,
@@ -55,23 +55,16 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
     : null;
 
   const allRooms = buildings.flatMap((b) => b.rooms);
-  const unassignedCount = participants.length - assignedIds.size;
-
-  const incompleteCount = allRooms.filter((r) => r.slots.some((s) => !s.participant)).length;
-  const fullCount = allRooms.filter((r) => r.slots.every((s) => s.participant)).length;
-
   const searchTerm = roomSearch.trim().toLowerCase();
 
-  const filteredBuildings = buildings
-    .map((b) => ({
-      ...b,
-      rooms: b.rooms.filter((r) => {
-        if (roomFilter === "incomplete" && !r.slots.some((s) => !s.participant)) return false;
-        if (roomFilter === "full" && !r.slots.every((s) => s.participant)) return false;
-        return true;
-      }),
-    }))
-    .filter((b) => b.rooms.length > 0);
+  // Day N → date of the Nth night (Day 1 = check-in date)
+  const selectedNight = (() => {
+    const d = new Date(EVENT_CHECK_IN_DATE + "T12:00:00");
+    d.setDate(d.getDate() + (selectedDay - 1));
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const filteredBuildings = buildings.filter((b) => b.rooms.length > 0);
 
   // ── Actions ───────────────────────────────────────────────────────────────────
   const assignToSlot = useCallback((roomId: string, slotId: string, participant: Participant) => {
@@ -483,38 +476,36 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
       )}
 
       <>
-        {/* Tabs row */}
-        <div className="flex items-end px-6 border-b border-gray-100">
-          {(["all", "incomplete", "full"] as const).map((f) => {
-            const label = f === "all" ? "All" : f === "incomplete" ? "Incomplete" : "Full";
-            const count =
-              f === "all" ? allRooms.length : f === "incomplete" ? incompleteCount : fullCount;
-            return (
-              <button
-                key={f}
-                onClick={() => setRoomFilter(f)}
-                className={cn(
-                  "text-sm py-3 mr-6 -mb-px border-b-2 transition-colors",
-                  roomFilter === f
-                    ? "border-gray-900 text-gray-900 font-medium"
-                    : "border-transparent text-gray-500 hover:text-gray-800",
-                )}
-              >
-                {label} ({count})
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search + status row */}
-        <div className="flex items-center px-6 py-3 border-b border-gray-100 gap-3">
-          <div className="relative w-[280px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        {/* Tabs + search row (combined) */}
+        <div className="flex items-end px-6 border-b border-gray-100 gap-6">
+          <div className="flex items-end">
+            {([1, 2, 3, 4, 5] as const).map((d) => {
+              const date = new Date(EVENT_CHECK_IN_DATE + "T12:00:00");
+              date.setDate(date.getDate() + (d - 1));
+              const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDay(d)}
+                  className={cn(
+                    "text-sm py-3 mr-6 -mb-px border-b-2 transition-colors",
+                    selectedDay === d
+                      ? "border-gray-900 text-gray-900 font-medium"
+                      : "border-transparent text-gray-500 hover:text-gray-800",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="relative w-[260px] ml-auto pb-2">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={roomSearch}
               onChange={(e) => setRoomSearch(e.target.value)}
-              placeholder="Rechercher un participant…"
-              className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-8 py-2 outline-none focus:border-gray-400 transition-colors"
+              placeholder="Search participants…"
+              className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-8 py-1.5 outline-none focus:border-gray-400 transition-colors"
             />
             {roomSearch && (
               <button
@@ -525,16 +516,6 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
               </button>
             )}
           </div>
-          <div className="ml-auto flex items-center">
-            <div
-              className={cn(
-                "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md",
-                unassignedCount === 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600",
-              )}
-            >
-              {unassignedCount === 0 ? "✓ All assigned" : `✗ ${unassignedCount} unassigned`}
-            </div>
-          </div>
         </div>
 
         {/* Main content */}
@@ -542,7 +523,7 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
           <RoomListView
             buildings={filteredBuildings}
             draggingParticipant={draggingParticipant}
-            selectedNight={null}
+            selectedNight={selectedNight}
             participantsById={new Map(participants.map((p) => [p.id, p]))}
             searchTerm={searchTerm}
             onRemove={handleRemove}
@@ -557,6 +538,7 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
             assignedIds={assignedIds}
             draggingId={draggingId}
             isRoomChipDragging={draggingSource !== null}
+            searchTerm={searchTerm}
             onDragStart={setDraggingId}
             onDragEnd={handleDragEnd}
             onUnassignDrop={() => {

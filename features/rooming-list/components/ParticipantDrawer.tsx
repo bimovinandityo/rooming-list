@@ -39,8 +39,8 @@ export function ParticipantDrawer({
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const unassigned = participants.filter((p) => !assignedIds.has(p.id));
-  const regular = unassigned.filter((p) => !p.isLateArrival);
-  const lateArrivals = unassigned.filter((p) => p.isLateArrival);
+  const regular = unassigned.filter((p) => !p);
+  const lateArrivals = unassigned.filter((p) => p);
 
   function applyFilter(list: Participant[]) {
     return list.filter((p) => {

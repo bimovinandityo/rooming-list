@@ -2,6 +2,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Match the visual density we like at 110% browser zoom */
+body {
+  zoom: 1.1;
+}
+
 /* CSS variables — design tokens */
 :root {
   --font-size: 14px;

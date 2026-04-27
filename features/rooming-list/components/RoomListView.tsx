@@ -37,7 +37,7 @@ export function RoomListView({
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
       {buildings.map((building) => {
-        const isLate = building.isLateArrival;
+        const isLate = building;
         const isCollapsed = collapsed[building.id];
 
         return (

@@ -222,9 +222,7 @@ export function GestionDesChambres() {
   }
 
   function handleMarkLate(id: string) {
-    setParticipants((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isLateArrival: !p.isLateArrival } : p)),
-    );
+    setParticipants((prev) => prev.map((p) => (p.id === id ? { ...p, isLateArrival: !p } : p)));
   }
 
   function handleAddLateArrival(name: string, isVip: boolean, isAccessibility: boolean) {
@@ -233,7 +231,6 @@ export function GestionDesChambres() {
       name,
       isVip: isVip || undefined,
       isAccessibility: isAccessibility || undefined,
-      isLateArrival: true,
     };
     setParticipants((prev) => [...prev, newP]);
   }
