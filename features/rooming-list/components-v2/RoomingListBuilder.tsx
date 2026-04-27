@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Pencil, Plus, BedDouble, Trash2, ImagePlus, X as XIcon } from "lucide-react";
+import { Pencil, Plus, BedDouble, Trash2, ImagePlus, X as XIcon, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Switch } from "@/shared/ui/switch";
@@ -42,6 +42,14 @@ const INITIAL_BUILDINGS: BuildingTemplate[] = [
         bedTypes: [{ id: "bt2", type: "Single bed", count: 2 }],
         privateBathroom: false,
         count: 12,
+      },
+      {
+        id: "r6",
+        name: "VIP suite",
+        bedTypes: [{ id: "bt7", type: "King bed", count: 1 }],
+        privateBathroom: true,
+        vipOnly: true,
+        count: 3,
       },
     ],
   },
@@ -275,6 +283,14 @@ function RoomModal({
         </DialogHeader>
 
         <div className="px-6 py-5 flex flex-col gap-5 max-h-[560px] overflow-y-auto">
+          <p className="text-xs text-gray-500 -mb-1 flex items-center gap-1.5">
+            Fields tagged{" "}
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded leading-none">
+              <Shuffle size={9} />
+              Auto-assign
+            </span>{" "}
+            improve auto-assign quality.
+          </p>
           {/* Building */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-gray-700">Accommodation</label>
@@ -298,7 +314,7 @@ function RoomModal({
 
           {/* Name + Floor row */}
           <div className="flex gap-3">
-            <div className="flex flex-col gap-1.5 flex-1">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
               <label className="text-sm font-medium text-gray-700">Room name</label>
               <input
                 value={name}
@@ -309,10 +325,16 @@ function RoomModal({
                 className="border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-400 transition-colors"
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-28">
-              <label className="text-sm font-medium text-gray-700">
+            <div className="flex flex-col gap-1.5 w-44 shrink-0">
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1 whitespace-nowrap">
                 Floor
-                <span className="ml-1 text-xs font-normal text-gray-400">(optional)</span>
+                <span
+                  title="Used by auto-assign to place PMR participants on floor 1"
+                  className="inline-flex items-center gap-0.5 text-[10px] font-medium bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded leading-none"
+                >
+                  <Shuffle size={9} />
+                  Auto-assign
+                </span>
               </label>
               <input
                 value={floor}
@@ -320,6 +342,7 @@ function RoomModal({
                 placeholder="E.g. 2"
                 className="border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-400 transition-colors"
               />
+              <p className="text-[10px] text-gray-400">Helps auto-assign place PMR on floor 1.</p>
             </div>
           </div>
 
@@ -448,9 +471,18 @@ function RoomModal({
           {/* VIP only */}
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-700">VIP only</label>
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                VIP only
+                <span
+                  title="Used by auto-assign to route VIPs into these rooms only"
+                  className="inline-flex items-center gap-0.5 text-[10px] font-medium bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded leading-none"
+                >
+                  <Shuffle size={9} />
+                  Auto-assign
+                </span>
+              </label>
               <p className="text-xs text-gray-400 mt-0.5">
-                Reserved exclusively for VIP participants
+                Reserved exclusively for VIP participants. Helps auto-assign route VIPs here.
               </p>
             </div>
             <Switch checked={vipOnly} onCheckedChange={setVipOnly} />
@@ -680,6 +712,11 @@ export function RoomingListBuilder() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-gray-900">{room.name}</span>
+                      {room.vipOnly && (
+                        <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded leading-none">
+                          VIP only
+                        </span>
+                      )}
                       <button
                         onClick={() => setEditingRoom({ buildingId: building.id, room })}
                         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-gray-500 transition-all"

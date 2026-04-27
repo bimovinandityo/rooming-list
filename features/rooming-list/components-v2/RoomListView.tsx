@@ -9,6 +9,9 @@ import type { Building, Participant } from "../types";
 interface RoomListViewProps {
   buildings: Building[];
   draggingParticipant: Participant | null;
+  selectedNight: string | null;
+  participantsById: Map<string, Participant>;
+  searchTerm?: string;
   onRemove: (roomId: string, slotId: string) => void;
   onSlotClick: (roomId: string, slotId: string) => void;
   onDrop: (roomId: string, slotId: string) => void;
@@ -19,6 +22,9 @@ interface RoomListViewProps {
 export function RoomListView({
   buildings,
   draggingParticipant,
+  selectedNight,
+  participantsById,
+  searchTerm,
   onRemove,
   onSlotClick,
   onDrop,
@@ -35,7 +41,6 @@ export function RoomListView({
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
       {buildings.map((building) => {
-        const isLate = building.isLateArrival;
         const isCollapsed = collapsed[building.id];
 
         return (
@@ -43,31 +48,18 @@ export function RoomListView({
             {/* Building header */}
             <div
               className={cn(
-                "flex items-center justify-between px-4 py-2.5 rounded-t-lg border",
+                "flex items-center justify-between px-4 py-2.5 rounded-t-lg border bg-gray-50 border-gray-200",
                 isCollapsed ? "rounded-b-lg" : "border-b-0",
-                isLate ? "bg-orange-50 border-orange-200" : "bg-gray-50 border-gray-200",
               )}
             >
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => toggle(building.id)}
-                  className={cn("transition-colors", isLate ? "text-orange-400" : "text-gray-400")}
+                  className="text-gray-400 transition-colors"
                 >
                   {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 </button>
-                <span
-                  className={cn(
-                    "text-sm font-semibold",
-                    isLate ? "text-orange-700" : "text-slate-700",
-                  )}
-                >
-                  {building.name}
-                </span>
-                {isLate && (
-                  <span className="text-[10px] font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                    Late arrivals
-                  </span>
-                )}
+                <span className="text-sm font-semibold text-slate-700">{building.name}</span>
               </div>
             </div>
 
@@ -85,6 +77,9 @@ export function RoomListView({
                       room={room}
                       draggingParticipant={draggingParticipant}
                       isDropTarget={dropTarget === room.id}
+                      selectedNight={selectedNight}
+                      participantsById={participantsById}
+                      searchTerm={searchTerm}
                       onRemove={(slotId) => onRemove(room.id, slotId)}
                       onSlotClick={(slotId) => onSlotClick(room.id, slotId)}
                       onDrop={(slotId) => {

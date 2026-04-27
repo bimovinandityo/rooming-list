@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Shuffle, RotateCcw, X } from "lucide-react";
+import { Shuffle, RotateCcw, X, Search } from "lucide-react";
 import { RoomListView } from "./RoomListView";
 import { ParticipantDrawer } from "./ParticipantDrawer";
 import { AssignParticipantModal } from "./AssignParticipantModal";
@@ -30,12 +30,15 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [showBuilderBanner, setShowBuilderBanner] = useState(true);
   const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
+  const [roomFilter, setRoomFilter] = useState<"all" | "incomplete" | "full">("all");
+  const [roomSearch, setRoomSearch] = useState("");
   const [rules, setRules] = useState({
     noGenderMix: true,
     vipAlone: true,
     accessibilityFirstFloor: true,
-    includeEarlyCiLateCo: true,
-    includeIrregularDates: true,
+    includeEarlyCiLateCo: false,
+    includeIrregularDates: false,
+    respectRoommatePrefs: true,
   });
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -53,6 +56,22 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
 
   const allRooms = buildings.flatMap((b) => b.rooms);
   const unassignedCount = participants.length - assignedIds.size;
+
+  const incompleteCount = allRooms.filter((r) => r.slots.some((s) => !s.participant)).length;
+  const fullCount = allRooms.filter((r) => r.slots.every((s) => s.participant)).length;
+
+  const searchTerm = roomSearch.trim().toLowerCase();
+
+  const filteredBuildings = buildings
+    .map((b) => ({
+      ...b,
+      rooms: b.rooms.filter((r) => {
+        if (roomFilter === "incomplete" && !r.slots.some((s) => !s.participant)) return false;
+        if (roomFilter === "full" && !r.slots.every((s) => s.participant)) return false;
+        return true;
+      }),
+    }))
+    .filter((b) => b.rooms.length > 0);
 
   // ── Actions ───────────────────────────────────────────────────────────────────
   const assignToSlot = useCallback((roomId: string, slotId: string, participant: Participant) => {
@@ -204,92 +223,210 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
       );
     }
 
+    let skippedIrregular = 0;
+    let skippedEarlyLate = 0;
     const unassigned = allUnassigned.filter((p) => {
-      if (!rules.includeEarlyCiLateCo && hasEarlyCiLateCo(p)) return false;
-      if (!rules.includeIrregularDates && hasIrregularDates(p)) return false;
+      // Irregular dates wins over early/late if both apply (a person with non-standard dates
+      // is by definition not "early on day 1" — they arrive on day 2 etc.)
+      if (!rules.includeIrregularDates && hasIrregularDates(p)) {
+        skippedIrregular++;
+        return false;
+      }
+      if (!rules.includeEarlyCiLateCo && hasEarlyCiLateCo(p)) {
+        skippedEarlyLate++;
+        return false;
+      }
       return true;
     });
 
-    const skippedByFilter = allUnassigned.length - unassigned.length;
+    const skippedByFilter = skippedIrregular + skippedEarlyLate;
 
-    // Sort: accessibility first, then VIP, then regular
+    // Sort: accessibility first, then VIP, then participants with prefs (so anchors land early), then regular
     const sorted = [...unassigned].sort((a, b) => {
       if (a.isAccessibility && !b.isAccessibility) return -1;
       if (!a.isAccessibility && b.isAccessibility) return 1;
       if (a.isVip && !b.isVip) return -1;
       if (!a.isVip && b.isVip) return 1;
+      const aHasPrefs = (a.roommatePreferences?.length ?? 0) > 0;
+      const bHasPrefs = (b.roommatePreferences?.length ?? 0) > 0;
+      if (aHasPrefs && !bHasPrefs) return -1;
+      if (!aHasPrefs && bHasPrefs) return 1;
       return 0;
     });
 
-    setBuildings((prev) => {
-      const next = structuredClone(prev) as Building[];
-      let placed = 0;
-      let skipped = 0;
+    const next = structuredClone(buildings) as Building[];
+    let placed = 0;
+    let skipped = 0;
+    const placedIds = new Set<string>();
+    const byId = new Map(unassigned.map((p) => [p.id, p]));
+    {
+      // Build mutual-pref clusters: if A prefers B and B prefers A, they form a group.
+      // We use union-find on mutual edges only (one-way prefs are too weak to force grouping).
+      function buildCluster(seedId: string): Participant[] {
+        const cluster: Participant[] = [];
+        const queue: string[] = [seedId];
+        const seen = new Set<string>();
+        while (queue.length) {
+          const id = queue.shift()!;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          const person = byId.get(id);
+          if (!person || placedIds.has(id)) continue;
+          cluster.push(person);
+          for (const prefId of person.roommatePreferences ?? []) {
+            const other = byId.get(prefId);
+            if (!other || placedIds.has(prefId) || seen.has(prefId)) continue;
+            // Mutual check
+            if (other.roommatePreferences?.includes(id)) queue.push(prefId);
+          }
+        }
+        return cluster;
+      }
 
-      for (const p of sorted) {
-        type RoomRef = { room: (typeof next)[0]["rooms"][0]; score: number };
-        const candidates: RoomRef[] = [];
+      function fitsInRoom(group: Participant[], r: Building["rooms"][0]): boolean {
+        const free = r.slots.filter((s) => !s.participant).length;
+        if (free < group.length) return false;
 
-        for (const b of next) {
-          for (const r of b.rooms) {
-            const freeSlot = r.slots.find((s) => !s.participant);
-            if (!freeSlot) continue;
+        const occupants = r.slots.map((s) => s.participant).filter(Boolean) as Participant[];
 
-            const occupants = r.slots.map((s) => s.participant).filter(Boolean) as Participant[];
-
-            // VIP alone: VIPs only in vipOnly rooms; non-VIPs cannot enter vipOnly rooms
-            if (rules.vipAlone) {
-              if (p.isVip && !r.vipOnly) continue;
-              if (!p.isVip && r.vipOnly) continue;
-            }
-
-            // No gender mix: if room has occupants with a gender, must match
-            if (rules.noGenderMix && p.gender) {
-              const roomGender = occupants.find((o) => o.gender)?.gender;
-              if (roomGender && roomGender !== p.gender) continue;
-            }
-
-            // Score (lower = better)
-            let score = 0;
-            if (rules.accessibilityFirstFloor && p.isAccessibility) {
-              score += r.floor === 1 ? -100 : 50;
-            }
-            if (p.isVip && r.vipOnly) score -= 20;
-            if (occupants.length > 0) score -= 5; // prefer filling partially-used rooms
-
-            candidates.push({ room: r, score });
+        // VIP rule: all-or-nothing. If any group member is VIP and !r.vipOnly, fail. If !VIP and r.vipOnly, fail.
+        if (rules.vipAlone) {
+          for (const g of group) {
+            if (g.isVip && !r.vipOnly) return false;
+            if (!g.isVip && r.vipOnly) return false;
           }
         }
 
-        if (candidates.length === 0) {
-          skipped++;
-          continue;
+        // Gender rule: all group members + occupants must share a gender (if any have one)
+        if (rules.noGenderMix) {
+          const allGenders = [...occupants, ...group].map((o) => o.gender).filter(Boolean);
+          const unique = new Set(allGenders);
+          if (unique.size > 1) return false;
         }
 
-        candidates.sort((a, b) => a.score - b.score);
-        const slot = candidates[0].room.slots.find((s) => !s.participant)!;
-        slot.participant = p;
-        placed++;
+        return true;
       }
 
-      const filterMsg = skippedByFilter > 0 ? ` · ${skippedByFilter} skipped (filter)` : "";
+      function scoreRoom(group: Participant[], r: Building["rooms"][0]): number {
+        const occupants = r.slots.map((s) => s.participant).filter(Boolean) as Participant[];
+        let score = 0;
+        const hasAccessibility = group.some((g) => g.isAccessibility);
+        if (rules.accessibilityFirstFloor && hasAccessibility) {
+          score += r.floor === 1 ? -100 : 50;
+        }
+        if (group.some((g) => g.isVip) && r.vipOnly) score -= 20;
+        if (occupants.length > 0) score -= 5;
+        // Prefer rooms that already contain any preferred roommate of any group member
+        if (rules.respectRoommatePrefs) {
+          for (const g of group) {
+            const matches = occupants.filter((o) => g.roommatePreferences?.includes(o.id)).length;
+            if (matches > 0) score -= 40 * matches;
+          }
+        }
+        // Prefer rooms whose free-slot count matches group size exactly (snug fit)
+        const free = r.slots.filter((s) => !s.participant).length;
+        if (free === group.length) score -= 8;
+        return score;
+      }
+
+      function placeGroup(group: Participant[]): boolean {
+        type RoomRef = { room: Building["rooms"][0]; score: number };
+        const candidates: RoomRef[] = [];
+        for (const b of next) {
+          for (const r of b.rooms) {
+            if (!fitsInRoom(group, r)) continue;
+            candidates.push({ room: r, score: scoreRoom(group, r) });
+          }
+        }
+        if (!candidates.length) return false;
+        candidates.sort((a, b) => a.score - b.score);
+        const room = candidates[0].room;
+        for (const g of group) {
+          const slot = room.slots.find((s) => !s.participant)!;
+          slot.participant = g;
+          placedIds.add(g.id);
+          placed++;
+        }
+        return true;
+      }
+
+      for (const p of sorted) {
+        if (placedIds.has(p.id)) continue;
+
+        // Try to place the entire mutual cluster together first
+        if (rules.respectRoommatePrefs && p.roommatePreferences?.length) {
+          const cluster = buildCluster(p.id);
+          if (cluster.length >= 2) {
+            // Try the full cluster first; fall back to smaller groups if it doesn't fit anywhere
+            for (let size = cluster.length; size >= 2; size--) {
+              const group = cluster.slice(0, size);
+              if (placeGroup(group)) {
+                break;
+              }
+              if (size === 2) {
+                // Couldn't even place the seed pair — fall through to single placement
+              }
+            }
+            if (placedIds.has(p.id)) continue;
+          }
+        }
+
+        // Single placement fallback
+        if (!placeGroup([p])) {
+          skipped++;
+        }
+      }
+
+      // Count unmet roommate preferences (placed participants whose room has none of their prefs)
+      let unmetPrefs = 0;
+      if (rules.respectRoommatePrefs) {
+        const finalAssignments = new Map<string, string>();
+        for (const b of next) {
+          for (const r of b.rooms) {
+            for (const s of r.slots) {
+              if (s.participant) finalAssignments.set(s.participant.id, r.id);
+            }
+          }
+        }
+        for (const p of sorted) {
+          if (!p.roommatePreferences?.length) continue;
+          const myRoom = finalAssignments.get(p.id);
+          if (!myRoom) continue;
+          const anyMet = p.roommatePreferences.some(
+            (prefId) => finalAssignments.get(prefId) === myRoom,
+          );
+          if (!anyMet) unmetPrefs++;
+        }
+      }
+
+      const parts: string[] = [];
+      if (skippedByFilter > 0) {
+        const reasons: string[] = [];
+        if (skippedIrregular > 0) reasons.push("irregular dates");
+        if (skippedEarlyLate > 0) reasons.push("early CI / late CO");
+        parts.push(`${skippedByFilter} skipped (${reasons.join(", ")})`);
+      }
+      if (unmetPrefs > 0)
+        parts.push(`${unmetPrefs} roommate preference${unmetPrefs !== 1 ? "s" : ""} unmet`);
+      const suffix = parts.length ? ` · ${parts.join(" · ")}` : "";
+
       if (skipped > 0) {
         toast.warning(
-          `${placed} assigned · ${skipped} couldn't be placed (rule conflicts)${filterMsg}`,
+          `${placed} assigned · ${skipped} couldn't be placed (rule conflicts)${suffix}`,
           {
             action: { label: "Undo", onClick: () => setBuildings(snapshot) },
             duration: 6000,
           },
         );
       } else {
-        toast.success(`${placed} participant${placed !== 1 ? "s" : ""} assigned${filterMsg}`, {
+        toast.success(`${placed} participant${placed !== 1 ? "s" : ""} assigned${suffix}`, {
           action: { label: "Undo", onClick: () => setBuildings(snapshot) },
           duration: 5000,
         });
       }
+    }
 
-      return next;
-    });
+    setBuildings(next);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -306,14 +443,14 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={handleStartOver}
-            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-4 py-2 text-gray-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
           >
             <RotateCcw size={13} />
             Start over
           </button>
           <button
             onClick={() => setShowAutoAssignModal(true)}
-            className="flex items-center gap-1.5 text-sm bg-slate-800 text-white rounded-md px-3 py-1.5 hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-1.5 text-sm bg-[#e8f747] text-gray-900 font-medium rounded-md px-4 py-2 hover:bg-[#ddf03f] transition-colors"
           >
             <Shuffle size={13} />
             Auto-assign
@@ -346,24 +483,56 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
       )}
 
       <>
-        {/* Stats row */}
-        <div className="flex items-center px-6 py-2 border-b border-gray-100">
+        {/* Tabs row */}
+        <div className="flex items-end px-6 border-b border-gray-100">
+          {(["all", "incomplete", "full"] as const).map((f) => {
+            const label = f === "all" ? "All" : f === "incomplete" ? "Incomplete" : "Full";
+            const count =
+              f === "all" ? allRooms.length : f === "incomplete" ? incompleteCount : fullCount;
+            return (
+              <button
+                key={f}
+                onClick={() => setRoomFilter(f)}
+                className={cn(
+                  "text-sm py-3 mr-6 -mb-px border-b-2 transition-colors",
+                  roomFilter === f
+                    ? "border-gray-900 text-gray-900 font-medium"
+                    : "border-transparent text-gray-500 hover:text-gray-800",
+                )}
+              >
+                {label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search + status row */}
+        <div className="flex items-center px-6 py-3 border-b border-gray-100 gap-3">
+          <div className="relative w-[280px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={roomSearch}
+              onChange={(e) => setRoomSearch(e.target.value)}
+              placeholder="Rechercher un participant…"
+              className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-8 py-2 outline-none focus:border-gray-400 transition-colors"
+            />
+            {roomSearch && (
+              <button
+                onClick={() => setRoomSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
           <div className="ml-auto flex items-center">
             <div
               className={cn(
-                "flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border",
-                unassignedCount === 0
-                  ? "border-green-200 bg-green-50 text-green-700"
-                  : "border-gray-200 bg-white text-gray-600",
+                "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md",
+                unassignedCount === 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600",
               )}
             >
-              <span
-                className={cn(
-                  "w-2 h-2 rounded-full shrink-0",
-                  unassignedCount === 0 ? "bg-green-500" : "bg-red-500",
-                )}
-              />
-              {unassignedCount === 0 ? "All assigned ✓" : `${unassignedCount} unassigned`}
+              {unassignedCount === 0 ? "✓ All assigned" : `✗ ${unassignedCount} unassigned`}
             </div>
           </div>
         </div>
@@ -371,9 +540,11 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         {/* Main content */}
         <div className="flex flex-1 min-h-0 bg-gray-50">
           <RoomListView
-            buildings={buildings}
+            buildings={filteredBuildings}
             draggingParticipant={draggingParticipant}
             selectedNight={null}
+            participantsById={new Map(participants.map((p) => [p.id, p]))}
+            searchTerm={searchTerm}
             onRemove={handleRemove}
             onSlotClick={handleSlotClick}
             onDrop={handleDrop}
@@ -429,9 +600,14 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
               },
               {
                 key: "accessibilityFirstFloor" as const,
-                label: "Accessibility needs → floor 1",
+                label: "PMR → floor 1",
+                description: "PMR participants are assigned to ground-floor rooms first.",
+              },
+              {
+                key: "respectRoommatePrefs" as const,
+                label: "Respect roommate preferences",
                 description:
-                  "Participants with accessibility needs are assigned to ground-floor rooms first.",
+                  "Prefer rooms that already contain a participant's requested roommate. Soft preference — other rules still win.",
               },
               {
                 key: "includeEarlyCiLateCo" as const,

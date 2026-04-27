@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, Users } from "lucide-react";
 import { cn } from "@/shared/utils";
 import { EVENT_CHECK_IN_DATE, EVENT_CHECK_OUT_DATE } from "../mock/data";
 import type { Room, Participant } from "../types";
@@ -23,6 +23,8 @@ interface RoomRowProps {
   draggingParticipant: Participant | null;
   isDropTarget: boolean;
   selectedNight: string | null;
+  participantsById: Map<string, Participant>;
+  searchTerm?: string;
   onRemove: (slotId: string) => void;
   onSlotClick: (slotId: string) => void;
   onDrop: (slotId: string) => void;
@@ -37,6 +39,8 @@ export function RoomRow({
   draggingParticipant,
   isDropTarget,
   selectedNight,
+  participantsById,
+  searchTerm,
   onRemove,
   onSlotClick,
   onDrop,
@@ -69,11 +73,22 @@ export function RoomRow({
     >
       {/* Room name */}
       <div className="w-44 shrink-0">
-        <div className="text-sm font-medium text-slate-800">{room.name}</div>
+        <div className="flex items-center gap-1.5">
+          <div className="text-sm font-medium text-slate-800">{room.name}</div>
+          {room.vipOnly && (
+            <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded leading-none shrink-0">
+              VIP only
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] text-gray-400">Floor {room.floor}</span>
+          {room.floor != null && (
+            <span className="text-[11px] text-gray-400">Floor {room.floor}</span>
+          )}
           {room.privateBathroom && (
-            <span className="text-[11px] text-gray-400">· Private bathroom</span>
+            <span className="text-[11px] text-gray-400">
+              {room.floor != null ? "· " : ""}Private bathroom
+            </span>
           )}
         </div>
       </div>
@@ -128,13 +143,24 @@ export function RoomRow({
                   ? "border border-dashed border-gray-200 bg-gray-50 text-gray-300 cursor-default"
                   : "bg-gray-100 border border-gray-200 text-slate-700 cursor-grab active:cursor-grabbing",
                 !absent && draggingParticipant?.id === p.id && "opacity-40",
+                searchTerm &&
+                  p.name.toLowerCase().includes(searchTerm) &&
+                  "ring-2 ring-yellow-400 bg-yellow-50 border-yellow-300",
               )}
             >
-              {/* Line 1: name + remove */}
+              {/* Line 1: name + VIP/PMR icons + remove */}
               <div className="flex items-center gap-1.5">
                 <span className={cn("text-sm leading-tight", absent && "line-through")}>
                   {p.name}
                 </span>
+                {!absent && p.isVip && (
+                  <span className="shrink-0 text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded leading-none">
+                    VIP
+                  </span>
+                )}
+                {!absent && p.isAccessibility && (
+                  <span className="shrink-0 text-[10px] leading-none">♿</span>
+                )}
                 {!absent && (
                   <button
                     onClick={() => onRemove(slot.id)}
@@ -144,19 +170,9 @@ export function RoomRow({
                   </button>
                 )}
               </div>
-              {/* Line 2: badges + CI→CO dates (matches drawer row) */}
+              {/* Line 2: dates + Early in/Late out (matches drawer row) */}
               {!absent && (
-                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                  {p.isVip && (
-                    <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded leading-none">
-                      VIP
-                    </span>
-                  )}
-                  {p.isAccessibility && (
-                    <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0.5 rounded leading-none">
-                      ♿
-                    </span>
-                  )}
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <span
                     className={cn(
                       "text-[10px] leading-none",
@@ -175,6 +191,34 @@ export function RoomRow({
                       Late out
                     </span>
                   )}
+                </div>
+              )}
+              {/* Roommate preferences with met/unmet state */}
+              {!absent && p.roommatePreferences && p.roommatePreferences.length > 0 && (
+                <div className="flex items-center gap-1 mt-0.5 text-[10px] leading-tight">
+                  <Users size={10} className="shrink-0 text-violet-500" />
+                  <span className="flex flex-wrap gap-x-1">
+                    {p.roommatePreferences.map((prefId, i) => {
+                      const full = participantsById.get(prefId)?.name;
+                      if (!full) return null;
+                      const [first, ...rest] = full.split(" ");
+                      const last = rest[rest.length - 1];
+                      const prefName = last ? `${first} ${last[0]}.` : first;
+                      const isInSameRoom = room.slots.some((s) => s.participant?.id === prefId);
+                      return (
+                        <span
+                          key={prefId}
+                          className={cn(
+                            isInSameRoom ? "text-emerald-600 font-medium" : "text-violet-600",
+                          )}
+                        >
+                          {isInSameRoom && "✓ "}
+                          {prefName}
+                          {i < p.roommatePreferences!.length - 1 ? "," : ""}
+                        </span>
+                      );
+                    })}
+                  </span>
                 </div>
               )}
               {/* Per-night absence reason */}

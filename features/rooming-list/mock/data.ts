@@ -162,7 +162,7 @@ function generateParticipants(): Participant[] {
     const lastName = LAST[Math.floor(rng() * LAST.length)];
 
     const isVip = rng() < 0.08;
-    const isAccessibility = !isVip && rng() < 0.05;
+    const isAccessibility = false; // assigned deterministically below — exactly 3 PMR
 
     // ~10% have a non-standard check-in or check-out date
     let checkInDate = EVENT_CHECK_IN_DATE;
@@ -206,7 +206,52 @@ function generateParticipants(): Participant[] {
   return participants;
 }
 
-export const mockParticipants = generateParticipants();
+export const mockParticipants = (() => {
+  const list = generateParticipants();
+  const rng = mkRng(7);
+
+  // Exactly 3 non-VIP participants marked as PMR (deterministic pick spread across the list)
+  const pmrIndices = [17, 84, 153];
+  for (const idx of pmrIndices) {
+    const p = list[idx];
+    if (p && !p.isVip) p.isAccessibility = true;
+  }
+
+  // Pair participants only when they are compatible enough to actually be roomed together.
+  // Compatibility = same gender, same VIP status, same accessibility status, same date bracket.
+  // This keeps the prototype's auto-assign success rate around 80%+.
+  function dateBracket(p: Participant) {
+    return `${p.checkInDate ?? EVENT_CHECK_IN_DATE}|${p.checkOutDate ?? EVENT_CHECK_OUT_DATE}`;
+  }
+  function compatible(a: Participant, b: Participant) {
+    if (a.gender !== b.gender) return false;
+    if (!!a.isVip !== !!b.isVip) return false;
+    if (!!a.isAccessibility !== !!b.isAccessibility) return false;
+    if (dateBracket(a) !== dateBracket(b)) return false;
+    return true;
+  }
+
+  // ~25% of participants get 1–2 mutual roommate preferences.
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    if ((a.roommatePreferences?.length ?? 0) >= 2) continue;
+    if (rng() > 0.25) continue;
+
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const j = Math.floor(rng() * list.length);
+      const b = list[j];
+      if (b === a) continue;
+      if (!compatible(a, b)) continue;
+      if ((b.roommatePreferences?.length ?? 0) >= 2) continue;
+      if (a.roommatePreferences?.includes(b.id)) continue;
+      a.roommatePreferences = [...(a.roommatePreferences ?? []), b.id];
+      b.roommatePreferences = [...(b.roommatePreferences ?? []), a.id];
+      break;
+    }
+  }
+
+  return list;
+})();
 
 // ── Photo pool ────────────────────────────────────────────────────────────────
 const PHOTOS = [

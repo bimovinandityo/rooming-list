@@ -4,12 +4,14 @@ export interface Participant {
   gender?: "M" | "F";
   isVip?: boolean;
   isAccessibility?: boolean;
-  isLateArrival?: boolean;
   avatarUrl?: string;
   checkInDate?: string; // "YYYY-MM-DD"
   checkOutDate?: string; // "YYYY-MM-DD"
   isEarlyCheckIn?: boolean;
   isLateCheckOut?: boolean;
+  roomPreference?: string;
+  /** IDs of other participants this person wants to room with. Soft preference. */
+  roommatePreferences?: string[];
 }
 
 export interface RoomSlot {
@@ -31,8 +33,7 @@ export interface Room {
 export interface Building {
   id: string;
   name: string;
-  isLateArrival?: boolean;
   rooms: Room[];
 }
 
-export type ParticipantFilter = "all" | "vip" | "pmr";
+export type ParticipantFilter = "all" | "vip" | "accessibility";
