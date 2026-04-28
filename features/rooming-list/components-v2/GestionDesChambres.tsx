@@ -169,6 +169,38 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
     setTargetSlot(null);
   }
 
+  function handleModalAssignMany(picks: Participant[]) {
+    if (!targetSlot || picks.length === 0) return;
+    const room = allRooms.find((r) => r.id === targetSlot.roomId);
+    if (!room) return;
+    // Fill empty slots in order, starting from the clicked slot if it's still empty.
+    const emptySlots = room.slots.filter((s) => !s.participant);
+    const ordered = [
+      ...emptySlots.filter((s) => s.id === targetSlot.slotId),
+      ...emptySlots.filter((s) => s.id !== targetSlot.slotId),
+    ];
+    setBuildings((prev) =>
+      prev.map((b) => ({
+        ...b,
+        rooms: b.rooms.map((r) => {
+          if (r.id !== room.id) return r;
+          const updatedSlots = r.slots.map((s) => ({ ...s }));
+          ordered.forEach((slot, i) => {
+            const p = picks[i];
+            if (!p) return;
+            const idx = updatedSlots.findIndex((u) => u.id === slot.id);
+            if (idx !== -1) updatedSlots[idx] = { ...updatedSlots[idx], participant: p };
+          });
+          return { ...r, slots: updatedSlots };
+        }),
+      })),
+    );
+    toast.success(`${picks.length} participant${picks.length !== 1 ? "s" : ""} → ${room.name}`, {
+      duration: 2000,
+    });
+    setTargetSlot(null);
+  }
+
   function handleStartOver() {
     if (assignedIds.size === 0) {
       toast.info("No assignments to clear");
@@ -555,7 +587,14 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
         onClose={() => setTargetSlot(null)}
         participants={participants}
         assignedIds={assignedIds}
+        emptySlotCount={
+          targetSlot
+            ? (allRooms.find((r) => r.id === targetSlot.roomId)?.slots.filter((s) => !s.participant)
+                .length ?? 1)
+            : 1
+        }
         onAssign={handleModalAssign}
+        onAssignMany={handleModalAssignMany}
       />
 
       {/* Auto-assign modal */}
