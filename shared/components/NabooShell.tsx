@@ -5,7 +5,7 @@ import {
   FileText,
   CreditCard,
   Monitor,
-  Users,
+  Hotel,
   Package,
   Megaphone,
   MessageSquare,
@@ -64,8 +64,8 @@ const NAV_SECTIONS: NavSection[] = [
         children: [{ label: "Event editor" }, { label: "Forms" }],
       },
       {
-        icon: Users,
-        label: "Participants",
+        icon: Hotel,
+        label: "Accommodation",
         parentActiveKeys: ["participants-rooming-list"],
         children: [
           { label: "Guest list" },
