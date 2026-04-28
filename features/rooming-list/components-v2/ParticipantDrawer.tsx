@@ -44,8 +44,17 @@ export function ParticipantDrawer({
   const [isOver, setIsOver] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const irregularAnchorRef = useRef<HTMLDivElement>(null);
+
   function scrollToTop() {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function scrollToIrregular() {
+    const container = scrollRef.current;
+    const anchor = irregularAnchorRef.current;
+    if (!container || !anchor) return;
+    container.scrollTo({ top: Math.max(0, anchor.offsetTop - 28), behavior: "smooth" });
   }
 
   const nameById = new Map(participants.map((p) => [p.id, p.name]));
@@ -143,12 +152,7 @@ export function ParticipantDrawer({
 
         {irregular.length > 0 && (
           <>
-            <div className="sticky bottom-0 z-10 h-7 w-full flex items-center justify-between px-4 bg-gray-50 border-y border-gray-100">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
-                Irregular dates
-              </span>
-              <span className="text-[10px] text-gray-400 tabular-nums">{irregular.length}</span>
-            </div>
+            <div ref={irregularAnchorRef} aria-hidden className="h-0" />
             {irregular.map((p) => (
               <DrawerRow
                 key={p.id}
@@ -162,6 +166,19 @@ export function ParticipantDrawer({
           </>
         )}
       </div>
+
+      {/* Permanent Irregular dates bar — always visible at the drawer bottom */}
+      {irregular.length > 0 && (
+        <button
+          onClick={scrollToIrregular}
+          className="shrink-0 h-7 w-full flex items-center justify-between px-4 bg-gray-50 border-t border-gray-100 hover:bg-gray-100 transition-colors"
+        >
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+            Irregular dates
+          </span>
+          <span className="text-[10px] text-gray-400 tabular-nums">{irregular.length}</span>
+        </button>
+      )}
     </div>
   );
 }

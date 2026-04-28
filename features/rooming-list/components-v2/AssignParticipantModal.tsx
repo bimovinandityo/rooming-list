@@ -2,9 +2,18 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
-import { Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/shared/utils";
+import { EVENT_CHECK_IN_DATE, EVENT_CHECK_OUT_DATE } from "../mock/data";
 import type { Participant } from "../types";
+
+function fmt(date: string) {
+  return new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 interface AssignParticipantModalProps {
   open: boolean;
@@ -28,6 +37,7 @@ export function AssignParticipantModal({
       !assignedIds.has(p.id) &&
       (search === "" || p.name.toLowerCase().includes(search.toLowerCase())),
   );
+  const nameById = new Map(participants.map((p) => [p.id, p.name]));
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -51,33 +61,91 @@ export function AssignParticipantModal({
           </div>
         </div>
 
-        <div className="max-h-[320px] overflow-y-auto py-1">
+        <div className="max-h-[320px] overflow-y-auto divide-y divide-gray-200/60">
           {available.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-8">No participants available</p>
           )}
-          {available.map((p) => (
-            <button
-              key={p.id}
-              className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors text-left"
-              onClick={() => {
-                onAssign(p);
-                onClose();
-              }}
-            >
-              <div className="h-7 w-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-[#101f34] shrink-0">
-                {p.name.charAt(0)}
-              </div>
-              <span className="flex-1 text-sm text-[#101f34]">{p.name}</span>
-              <div className="flex items-center gap-1">
-                {p.isVip && (
-                  <span className="text-xs px-1.5 py-0.5 bg-[#eff779] text-[#101f34] rounded font-medium">
-                    VIP
-                  </span>
-                )}
-                {p.isAccessibility && <span className="text-sm">♿</span>}
-              </div>
-            </button>
-          ))}
+          {available.map((p) => {
+            const nonStandardDates =
+              (p.checkInDate && p.checkInDate !== EVENT_CHECK_IN_DATE) ||
+              (p.checkOutDate && p.checkOutDate !== EVENT_CHECK_OUT_DATE);
+            const showEarly =
+              p.isEarlyCheckIn && (p.checkInDate ?? EVENT_CHECK_IN_DATE) === EVENT_CHECK_IN_DATE;
+            const showLate =
+              p.isLateCheckOut && (p.checkOutDate ?? EVENT_CHECK_OUT_DATE) === EVENT_CHECK_OUT_DATE;
+            const hasPrefs = (p.roommatePreferences?.length ?? 0) > 0;
+
+            return (
+              <button
+                key={p.id}
+                onClick={() => {
+                  onAssign(p);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-700 truncate">{p.name}</p>
+                    <p
+                      className={cn(
+                        "text-[10px] leading-none mt-1",
+                        nonStandardDates ? "text-amber-600 font-medium" : "text-gray-400",
+                      )}
+                    >
+                      {fmt(p.checkInDate ?? EVENT_CHECK_IN_DATE)} →{" "}
+                      {fmt(p.checkOutDate ?? EVENT_CHECK_OUT_DATE)}
+                    </p>
+                    {hasPrefs && (
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-violet-600 leading-tight">
+                        <Users size={10} className="shrink-0" />
+                        <span className="truncate">
+                          {p
+                            .roommatePreferences!.map((id) => {
+                              const full = nameById.get(id);
+                              if (!full) return "";
+                              const [first, ...rest] = full.split(" ");
+                              const last = rest[rest.length - 1];
+                              return last ? `${first} ${last[0]}.` : first;
+                            })
+                            .filter(Boolean)
+                            .join(", ")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {p.isVip && (
+                      <span className="text-[9px] font-bold bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded leading-none">
+                        VIP
+                      </span>
+                    )}
+                    {p.isAccessibility && (
+                      <span className="text-[10px] leading-none" title="Accessibility">
+                        ♿
+                      </span>
+                    )}
+                    {showEarly && (
+                      <span
+                        title="Early check-in"
+                        className="text-[9px] font-medium bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded leading-none"
+                      >
+                        Early
+                      </span>
+                    )}
+                    {showLate && (
+                      <span
+                        title="Late check-out"
+                        className="text-[9px] font-medium bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded leading-none"
+                      >
+                        Late
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </DialogContent>
     </Dialog>

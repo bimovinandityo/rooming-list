@@ -10,6 +10,8 @@ export interface RoomTemplate {
   bedTypes: BedTypeEntry[];
   privateBathroom: boolean;
   count: number;
+  /** First room number; subsequent rooms are numbered consecutively. Optional. */
+  startNumber?: number;
   floor?: number;
   vipOnly?: boolean;
   photos?: string[];

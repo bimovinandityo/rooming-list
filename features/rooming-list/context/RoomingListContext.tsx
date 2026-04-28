@@ -21,7 +21,12 @@ function templatesToBuildings(templates: BuildingTemplate[]): Building[] {
       const totalBeds = rt.bedTypes.reduce((sum, e) => sum + e.count, 0);
       return Array.from({ length: rt.count }, (_, i) => ({
         id: `${rt.id}-${i}`,
-        name: rt.count > 1 ? `${rt.name} ${i + 1}` : rt.name,
+        name:
+          rt.startNumber != null
+            ? `${rt.name} ${rt.startNumber + i}`
+            : rt.count > 1
+              ? `${rt.name} ${i + 1}`
+              : rt.name,
         bedDescription: describeBeds(rt),
         privateBathroom: rt.privateBathroom,
         photoUrl: rt.photos?.[rt.primaryPhotoIndex ?? 0],

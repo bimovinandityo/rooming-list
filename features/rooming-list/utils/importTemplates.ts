@@ -100,6 +100,17 @@ export function rowsToTemplates(rows: Record<string, unknown>[]): ImportResult {
         const n = parseInt(String(f), 10);
         return Number.isFinite(n) ? n : undefined;
       })(),
+      startNumber: (() => {
+        const s = pick(row, [
+          "start number",
+          "starting room number",
+          "room number",
+          "first number",
+        ]);
+        if (s == null || s === "") return undefined;
+        const n = parseInt(String(s), 10);
+        return Number.isFinite(n) ? n : undefined;
+      })(),
     };
 
     const key = buildingName.toLowerCase();

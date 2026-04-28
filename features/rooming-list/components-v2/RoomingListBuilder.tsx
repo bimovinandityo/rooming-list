@@ -180,22 +180,26 @@ function RoomModal({
   onClose,
   onAdd,
   onSave,
-  initialBuildingId,
+  initialBuildingName,
   initialRoom,
+  buildingSuggestions,
 }: {
   open: boolean;
   onClose: () => void;
-  onAdd?: (buildingId: string, room: Omit<RoomTemplate, "id">) => void;
-  onSave?: (buildingId: string, room: RoomTemplate) => void;
-  initialBuildingId?: string;
+  onAdd?: (buildingName: string, room: Omit<RoomTemplate, "id">) => void;
+  onSave?: (buildingName: string, room: RoomTemplate) => void;
+  initialBuildingName?: string;
   initialRoom?: RoomTemplate;
+  buildingSuggestions: string[];
 }) {
   const isEditing = !!initialRoom;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [stockIdx, setStockIdx] = useState(0);
 
-  const [buildingId, setBuildingId] = useState(initialBuildingId ?? AVAILABLE_BUILDINGS[0].id);
+  const [buildingName, setBuildingName] = useState(
+    initialBuildingName ?? AVAILABLE_BUILDINGS[0].name,
+  );
   const [name, setName] = useState(initialRoom?.name ?? "");
   const [floor, setFloor] = useState<string>(
     initialRoom?.floor != null ? String(initialRoom.floor) : "",
@@ -206,6 +210,9 @@ function RoomModal({
   const [privateBathroom, setPrivateBathroom] = useState(initialRoom?.privateBathroom ?? false);
   const [vipOnly, setVipOnly] = useState(initialRoom?.vipOnly ?? false);
   const [count, setCount] = useState(initialRoom?.count ?? 1);
+  const [startNumber, setStartNumber] = useState<string>(
+    initialRoom?.startNumber != null ? String(initialRoom.startNumber) : "",
+  );
   const [photos, setPhotos] = useState<string[]>(initialRoom?.photos ?? []);
   const [primaryPhotoIndex, setPrimaryPhotoIndex] = useState(initialRoom?.primaryPhotoIndex ?? 0);
 
@@ -262,21 +269,25 @@ function RoomModal({
   function handleSubmit() {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const trimmedBuilding = buildingName.trim();
+    if (!trimmedBuilding) return;
     const floorVal = floor.trim() !== "" ? parseInt(floor) : undefined;
+    const startNum = startNumber.trim() !== "" ? parseInt(startNumber) : undefined;
     const roomData = {
       name: trimmed,
       bedTypes,
       privateBathroom,
       vipOnly: vipOnly || undefined,
       count,
+      startNumber: Number.isFinite(startNum) ? startNum : undefined,
       floor: floorVal,
       photos,
       primaryPhotoIndex,
     };
     if (isEditing && onSave && initialRoom) {
-      onSave(buildingId, { ...initialRoom, ...roomData });
+      onSave(trimmedBuilding, { ...initialRoom, ...roomData });
     } else if (onAdd) {
-      onAdd(buildingId, roomData);
+      onAdd(trimmedBuilding, roomData);
     }
     onClose();
   }
@@ -304,22 +315,18 @@ function RoomModal({
           {/* Building */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-gray-700">Accommodation</label>
-            <div className="relative">
-              <select
-                value={buildingId}
-                onChange={(e) => setBuildingId(e.target.value)}
-                className="w-full appearance-none border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 bg-white outline-none focus:border-gray-400 transition-colors pr-8"
-              >
-                {AVAILABLE_BUILDINGS.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">
-                ▾
-              </span>
-            </div>
+            <input
+              list="building-suggestions"
+              value={buildingName}
+              onChange={(e) => setBuildingName(e.target.value)}
+              placeholder="E.g. Main Building"
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 bg-white outline-none focus:border-gray-400 transition-colors"
+            />
+            <datalist id="building-suggestions">
+              {buildingSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
 
           {/* Name + Floor row */}
@@ -529,6 +536,27 @@ function RoomModal({
               </button>
             </div>
           </div>
+
+          {/* Starting room number */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
+              Starting room number
+              <span className="ml-1.5 text-xs font-normal text-gray-400">Optional</span>
+            </label>
+            <p className="text-xs text-gray-400">
+              Subsequent rooms will be numbered consecutively (e.g.{" "}
+              {startNumber.trim() && Number.isFinite(parseInt(startNumber)) && count > 1
+                ? `${parseInt(startNumber)}, ${parseInt(startNumber) + 1}, …, ${parseInt(startNumber) + count - 1}`
+                : "101, 102, 103…"}
+              ).
+            </p>
+            <input
+              value={startNumber}
+              onChange={(e) => setStartNumber(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="E.g. 101"
+              className="w-32 border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 outline-none focus:border-gray-400 transition-colors"
+            />
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
@@ -540,7 +568,7 @@ function RoomModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!name.trim()}
+            disabled={!name.trim() || !buildingName.trim()}
             className="text-sm px-4 py-2 bg-[#e8f747] text-gray-900 font-medium rounded-md hover:bg-[#ddf03f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {isEditing ? "Save" : "Add"}
@@ -559,9 +587,10 @@ export function RoomingListBuilder() {
   const [buildings, setBuildings] = useState<BuildingTemplate[]>(INITIAL_BUILDINGS);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalKey, setAddModalKey] = useState(0);
-  const [editingRoom, setEditingRoom] = useState<{ buildingId: string; room: RoomTemplate } | null>(
-    null,
-  );
+  const [editingRoom, setEditingRoom] = useState<{
+    buildingName: string;
+    room: RoomTemplate;
+  } | null>(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -606,27 +635,56 @@ export function RoomingListBuilder() {
   const totalRooms = allRooms.reduce((sum, r) => sum + r.count, 0);
   const totalBeds = allRooms.reduce((sum, r) => sum + r.count * totalBedsInRoom(r.bedTypes), 0);
 
-  function handleAddRoom(buildingId: string, room: Omit<RoomTemplate, "id">) {
+  const buildingSuggestions = Array.from(
+    new Set([...buildings.map((b) => b.name), ...AVAILABLE_BUILDINGS.map((b) => b.name)]),
+  );
+
+  function handleAddRoom(buildingName: string, room: Omit<RoomTemplate, "id">) {
     const newRoom: RoomTemplate = { ...room, id: `r-${Date.now()}` };
+    const trimmed = buildingName.trim();
     setBuildings((prev) => {
-      const buildingName =
-        AVAILABLE_BUILDINGS.find((b) => b.id === buildingId)?.name ?? "New Building";
-      const exists = prev.find((b) => b.id === buildingId);
+      const exists = prev.find((b) => b.name.toLowerCase() === trimmed.toLowerCase());
       if (exists) {
-        return prev.map((b) => (b.id === buildingId ? { ...b, rooms: [...b.rooms, newRoom] } : b));
+        return prev.map((b) => (b.id === exists.id ? { ...b, rooms: [...b.rooms, newRoom] } : b));
       }
-      return [...prev, { id: buildingId, name: buildingName, rooms: [newRoom] }];
+      const id = `b-${Date.now()}-${trimmed.toLowerCase().replace(/\s+/g, "-")}`;
+      return [...prev, { id, name: trimmed, rooms: [newRoom] }];
     });
   }
 
-  function handleSaveRoom(buildingId: string, updated: RoomTemplate) {
-    setBuildings((prev) =>
-      prev.map((b) =>
-        b.id !== buildingId
-          ? b
-          : { ...b, rooms: b.rooms.map((r) => (r.id === updated.id ? updated : r)) },
-      ),
-    );
+  function handleSaveRoom(buildingName: string, updated: RoomTemplate) {
+    const trimmed = buildingName.trim();
+    setBuildings((prev) => {
+      // Locate which building currently holds this room.
+      const sourceBuilding = prev.find((b) => b.rooms.some((r) => r.id === updated.id));
+      const target = prev.find((b) => b.name.toLowerCase() === trimmed.toLowerCase());
+
+      // Same building (or no rename): replace in place.
+      if (sourceBuilding && target && sourceBuilding.id === target.id) {
+        return prev.map((b) =>
+          b.id !== target.id
+            ? b
+            : { ...b, rooms: b.rooms.map((r) => (r.id === updated.id ? updated : r)) },
+        );
+      }
+
+      // Renamed/moved to a different building: remove from source, add to target (create if new).
+      const removed = prev
+        .map((b) =>
+          sourceBuilding && b.id === sourceBuilding.id
+            ? { ...b, rooms: b.rooms.filter((r) => r.id !== updated.id) }
+            : b,
+        )
+        .filter((b) => b.rooms.length > 0);
+
+      if (target) {
+        return removed.map((b) =>
+          b.id === target.id ? { ...b, rooms: [...b.rooms, updated] } : b,
+        );
+      }
+      const id = `b-${Date.now()}-${trimmed.toLowerCase().replace(/\s+/g, "-")}`;
+      return [...removed, { id, name: trimmed, rooms: [updated] }];
+    });
   }
 
   function handleDelete(buildingId: string, roomId: string) {
@@ -781,7 +839,7 @@ export function RoomingListBuilder() {
                         </span>
                       )}
                       <button
-                        onClick={() => setEditingRoom({ buildingId: building.id, room })}
+                        onClick={() => setEditingRoom({ buildingName: building.name, room })}
                         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-gray-500 transition-all"
                       >
                         <Pencil size={12} />
@@ -789,6 +847,16 @@ export function RoomingListBuilder() {
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {describeBedTypes(room.bedTypes, room.privateBathroom)}
+                      {room.startNumber != null && (
+                        <>
+                          {" · "}
+                          <span className="text-gray-500">
+                            {room.count > 1
+                              ? `Rooms ${room.startNumber}–${room.startNumber + room.count - 1}`
+                              : `Room ${room.startNumber}`}
+                          </span>
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -836,14 +904,16 @@ export function RoomingListBuilder() {
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddRoom}
+        buildingSuggestions={buildingSuggestions}
       />
       <RoomModal
         key={editingRoom?.room.id ?? "edit-modal"}
         open={!!editingRoom}
         onClose={() => setEditingRoom(null)}
         onSave={handleSaveRoom}
-        initialBuildingId={editingRoom?.buildingId}
+        initialBuildingName={editingRoom?.buildingName}
         initialRoom={editingRoom?.room}
+        buildingSuggestions={buildingSuggestions}
       />
     </div>
   );
