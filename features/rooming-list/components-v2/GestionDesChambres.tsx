@@ -14,6 +14,7 @@ import {
   EVENT_CHECK_OUT_DATE,
 } from "../mock/data";
 import { cn } from "@/shared/utils";
+import { TabHeader } from "@/shared/components/TabHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { useRoomingList } from "../context/RoomingListContext";
 import type { Building, Participant } from "../types";
@@ -531,54 +532,86 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
-        {!hideTitle && (
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
-            <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
+      {/* Tab header */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".csv,.xlsx,.xls,.pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportFile(file);
+          e.target.value = "";
+        }}
+      />
+      <div className="px-8 py-6 shrink-0">
+        {hideTitle ? (
+          <TabHeader
+            subtitle="Assign guests to rooms and track occupancy."
+            actions={
+              <>
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-600 hover:bg-gray-50 transition-colors"
+                  title="Import assignments from CSV or Excel"
+                >
+                  <Upload size={13} />
+                  Import
+                </button>
+                <button
+                  onClick={handleStartOver}
+                  className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  <RotateCcw size={13} />
+                  Start over
+                </button>
+                <button
+                  onClick={() => setShowAutoAssignModal(true)}
+                  className="flex items-center gap-1.5 text-sm bg-[#e8f747] text-gray-900 font-medium rounded-md px-3.5 py-2 hover:bg-[#ddf03f] transition-colors"
+                >
+                  <Shuffle size={13} />
+                  Auto-assign
+                </button>
+              </>
+            }
+          />
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-lg font-bold text-slate-800">Rooming list</h1>
+              <span className="text-sm text-gray-400">· {allRooms.length} rooms</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => importInputRef.current?.click()}
+                className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-600 hover:bg-gray-50 transition-colors"
+                title="Import assignments from CSV or Excel"
+              >
+                <Upload size={13} />
+                Import
+              </button>
+              <button
+                onClick={handleStartOver}
+                className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+              >
+                <RotateCcw size={13} />
+                Start over
+              </button>
+              <button
+                onClick={() => setShowAutoAssignModal(true)}
+                className="flex items-center gap-1.5 text-sm bg-[#e8f747] text-gray-900 font-medium rounded-md px-3.5 py-2 hover:bg-[#ddf03f] transition-colors"
+              >
+                <Shuffle size={13} />
+                Auto-assign
+              </button>
+            </div>
           </div>
         )}
-        <div className="flex items-center gap-2 ml-auto">
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls,.pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleImportFile(file);
-              e.target.value = "";
-            }}
-          />
-          <button
-            onClick={() => importInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-4 py-2 text-gray-600 hover:bg-gray-50 transition-colors"
-            title="Import assignments from CSV or Excel"
-          >
-            <Upload size={13} />
-            Import
-          </button>
-          <button
-            onClick={handleStartOver}
-            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-4 py-2 text-gray-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
-          >
-            <RotateCcw size={13} />
-            Start over
-          </button>
-          <button
-            onClick={() => setShowAutoAssignModal(true)}
-            className="flex items-center gap-1.5 text-sm bg-[#e8f747] text-gray-900 font-medium rounded-md px-4 py-2 hover:bg-[#ddf03f] transition-colors"
-          >
-            <Shuffle size={13} />
-            Auto-assign
-          </button>
-        </div>
       </div>
 
       {/* Builder source banner */}
       {publishedBuildings && publishedAt && showBuilderBanner && (
-        <div className="flex items-center justify-between px-6 py-2 bg-blue-50 border-b border-blue-100">
+        <div className="flex items-center justify-between px-8 py-2 bg-blue-50 border-b border-blue-100">
           <span className="text-xs text-blue-600">
             Rooms configured via Rooming list builder · Published at{" "}
             {publishedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
@@ -602,7 +635,7 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
 
       <>
         {/* Tabs + search row (combined) */}
-        <div className="flex items-end px-6 border-b border-gray-100 gap-6">
+        <div className="flex items-end px-8 border-b border-gray-100 gap-6">
           <div className="flex items-end">
             {([1, 2, 3, 4, 5] as const).map((d) => {
               const date = new Date(EVENT_CHECK_IN_DATE + "T12:00:00");

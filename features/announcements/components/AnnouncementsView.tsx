@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { TabHeader } from "@/shared/components/TabHeader";
 import { cn } from "@/shared/utils";
 
 interface Announcement {
@@ -179,7 +180,8 @@ export function AnnouncementsView() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-white">
-      <div className="max-w-3xl mx-auto px-8 py-6 flex flex-col gap-6">
+      <div className="max-w-4xl px-8 py-6 flex flex-col gap-5">
+        <TabHeader subtitle="Send messages to all participants." />
         {/* Composer */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <textarea

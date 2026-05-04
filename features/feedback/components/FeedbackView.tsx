@@ -2,6 +2,7 @@
 
 import { Mail, Star } from "lucide-react";
 import { cn } from "@/shared/utils";
+import { TabHeader } from "@/shared/components/TabHeader";
 
 interface RatingQuestion {
   id: string;
@@ -87,20 +88,19 @@ function avgFromDistribution(d: RatingQuestion["distribution"]): number {
 export function FeedbackView() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-white">
-      <div className="max-w-4xl mx-auto px-8 py-6 flex flex-col gap-5">
-        {/* Section toolbar */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Participant feedback</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">
-              {NOT_ANSWERED} participant{NOT_ANSWERED !== 1 ? "s" : ""} haven&rsquo;t responded yet
-            </span>
+      <div className="max-w-4xl px-8 py-6 flex flex-col gap-5">
+        <TabHeader
+          subtitle="Collect responses from participants."
+          actions={
             <button className="flex items-center gap-2 text-sm bg-gray-900 text-white px-3.5 py-2 rounded-md hover:bg-gray-700 transition-colors">
               <Mail size={13} />
               Send a reminder email
             </button>
-          </div>
-        </div>
+          }
+        />
+        <p className="text-xs text-gray-400 -mt-2">
+          {NOT_ANSWERED} participant{NOT_ANSWERED !== 1 ? "s" : ""} haven&rsquo;t responded yet
+        </p>
 
         {/* Rating questions */}
         {RATING_QUESTIONS.map((q) => (

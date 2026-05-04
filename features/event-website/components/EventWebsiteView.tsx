@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { TabHeader } from "@/shared/components/TabHeader";
 import { cn } from "@/shared/utils";
 
 const TABS = [
@@ -122,7 +123,21 @@ function EditorTab() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-8 py-6 flex flex-col gap-6">
+    <div className="max-w-5xl px-8 py-6 flex flex-col gap-6">
+      <TabHeader
+        subtitle="Customize how your event website looks."
+        actions={
+          <>
+            <button className="text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button className="text-sm bg-[#e8f747] text-gray-900 font-medium rounded-md px-3.5 py-2 hover:bg-[#ddf03f] transition-colors">
+              Save
+            </button>
+          </>
+        }
+      />
+
       {/* Promo banner */}
       <div className="rounded-lg bg-blue-50 border border-blue-100 px-6 py-5 flex items-start justify-between gap-6">
         <div>
@@ -135,19 +150,6 @@ function EditorTab() {
           Preview &amp; edit site
           <ChevronRight size={13} />
         </button>
-      </div>
-
-      {/* Section heading + actions */}
-      <div className="flex items-center justify-between mt-2">
-        <h2 className="text-base font-semibold text-gray-900">Editor</h2>
-        <div className="flex items-center gap-2">
-          <button className="text-sm border border-gray-200 rounded-md px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button className="text-sm bg-[#e8f747] text-gray-900 font-medium rounded-md px-5 py-2 hover:bg-[#ddf03f] transition-colors">
-            Save
-          </button>
-        </div>
       </div>
 
       {/* Logo & cover */}
@@ -415,29 +417,27 @@ function FormsTab() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-8 py-6 flex flex-col gap-5">
-      {/* Section header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Forms</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Add questions and edit the form</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleAdd}
-            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <Pencil size={13} />
-            Add a new question
-          </button>
-          <button
-            className="w-9 h-9 flex items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
-            title="Preview form"
-          >
-            <Eye size={14} />
-          </button>
-        </div>
-      </div>
+    <div className="max-w-5xl px-8 py-6 flex flex-col gap-5">
+      <TabHeader
+        subtitle="Build registration and RSVP forms."
+        actions={
+          <>
+            <button
+              onClick={handleAdd}
+              className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Pencil size={13} />
+              Add a new question
+            </button>
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              title="Preview form"
+            >
+              <Eye size={14} />
+            </button>
+          </>
+        }
+      />
 
       {/* Question list */}
       <div className="flex flex-col gap-3">

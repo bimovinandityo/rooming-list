@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil, Plus, Shuffle, Trash2, X as XIcon, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/shared/utils";
+import { TabHeader } from "@/shared/components/TabHeader";
 import { mockParticipants } from "../mock/data";
 import type { Participant } from "../types";
 
@@ -131,17 +132,18 @@ export function AttachmentsTab() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6 flex flex-col gap-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-gray-900">Manage your documents</h2>
-        <button
-          onClick={handleAddFolder}
-          className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <Plus size={13} />
-          Add folder
-        </button>
-      </div>
+      <TabHeader
+        subtitle="Share files with each participant."
+        actions={
+          <button
+            onClick={handleAddFolder}
+            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Plus size={13} />
+            Add folder
+          </button>
+        }
+      />
 
       {folders.map((f) => {
         const assigned = new Set(f.documents.flatMap((d) => d.participantIds));

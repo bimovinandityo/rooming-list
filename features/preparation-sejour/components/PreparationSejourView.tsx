@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { TabHeader } from "@/shared/components/TabHeader";
 import { cn } from "@/shared/utils";
 
 const TABS = [
@@ -156,14 +157,16 @@ function ContactsTab() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-6 flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-gray-900">Contacts</h2>
-        <button className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors">
-          <Plus size={13} />
-          Add contact
-        </button>
-      </div>
+    <div className="max-w-6xl px-8 py-6 flex flex-col gap-5">
+      <TabHeader
+        subtitle="Manage the key people for your event."
+        actions={
+          <button className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors">
+            <Plus size={13} />
+            Add contact
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {contacts.map((c) => (
@@ -417,31 +420,32 @@ function MenusTab() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-6 flex flex-col gap-5">
-      {/* Header with day navigation */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Menus</h2>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setDayIdx((i) => Math.max(0, i - 1))}
-            disabled={dayIdx === 0}
-            className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Previous day"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDayIdx((i) => Math.min(DAYS.length - 1, i + 1))}
-            disabled={dayIdx === DAYS.length - 1}
-            className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Next day"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
+    <div className="max-w-6xl px-8 py-6 flex flex-col gap-5">
+      <TabHeader
+        subtitle="Choose meals and handle dietary needs."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setDayIdx((i) => Math.max(0, i - 1))}
+              disabled={dayIdx === 0}
+              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous day"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDayIdx((i) => Math.min(DAYS.length - 1, i + 1))}
+              disabled={dayIdx === DAYS.length - 1}
+              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next day"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </>
+        }
+      />
 
       {/* Dietary requirements */}
       <article className="rounded-lg border border-gray-200 bg-white">
@@ -819,20 +823,21 @@ const SCHEDULE: ScheduleDay[] = [
 
 function ScheduleTab() {
   return (
-    <div className="px-8 py-6 flex flex-col gap-5">
-      {/* Top bar */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Schedule</h2>
-        <div className="flex items-center gap-2">
-          <button className="text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors">
-            Export iCalendar (ICS)
-          </button>
-          <button className="flex items-center gap-1.5 text-sm bg-gray-900 text-white px-3.5 py-2 rounded-md hover:bg-gray-700 transition-colors">
-            <Plus size={13} />
-            Add an event
-          </button>
-        </div>
-      </div>
+    <div className="max-w-6xl px-8 py-6 flex flex-col gap-5">
+      <TabHeader
+        subtitle="Plan the day-by-day agenda for participants."
+        actions={
+          <>
+            <button className="text-sm border border-gray-200 rounded-md px-3.5 py-2 text-gray-700 hover:bg-gray-50 transition-colors">
+              Export iCalendar (ICS)
+            </button>
+            <button className="flex items-center gap-1.5 text-sm bg-gray-900 text-white px-3.5 py-2 rounded-md hover:bg-gray-700 transition-colors">
+              <Plus size={13} />
+              Add an event
+            </button>
+          </>
+        }
+      />
 
       {/* Horizontal scroll of day columns */}
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -929,7 +934,9 @@ function InformationTab() {
   const [notifyFeedback, setNotifyFeedback] = useState(true);
 
   return (
-    <div className="max-w-5xl mx-auto px-8 py-6 flex flex-col gap-8">
+    <div className="max-w-6xl px-8 py-6 flex flex-col gap-5">
+      <TabHeader subtitle="Set up the basics of your event." />
+
       {/* Main info */}
       <section className="flex flex-col gap-5">
         <h2 className="text-base font-semibold text-gray-900">Main event information</h2>

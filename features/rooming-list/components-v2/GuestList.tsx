@@ -1,8 +1,19 @@
 "use client";
 
 import { useState, useMemo, Fragment } from "react";
-import { Pencil, Check, X, UserPlus, Search, Download, Star, Accessibility } from "lucide-react";
+import {
+  Pencil,
+  Check,
+  X,
+  UserPlus,
+  Search,
+  Download,
+  Star,
+  Accessibility,
+  RotateCw,
+} from "lucide-react";
 import { cn } from "@/shared/utils";
+import { TabHeader } from "@/shared/components/TabHeader";
 import { EVENT_CHECK_IN_DATE, EVENT_CHECK_OUT_DATE } from "../mock/data";
 import type { Building, Participant } from "../types";
 
@@ -225,22 +236,21 @@ export function GuestList({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6 flex flex-col gap-5">
-      {/* Section header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Guest list</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Manage participant details for this event</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="text-sm border border-gray-200 rounded-lg px-3.5 py-2 text-gray-600 hover:bg-gray-50 transition-colors">
-            Export list
-          </button>
-          <button className="flex items-center gap-1.5 text-sm font-medium bg-gray-900 text-white px-3.5 py-2 rounded-lg hover:bg-gray-700 transition-colors">
-            <UserPlus size={13} />
-            Add participant
-          </button>
-        </div>
-      </div>
+      <TabHeader
+        subtitle="Edit participant details, dates, and special needs."
+        actions={
+          <>
+            <button className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-3.5 py-2 text-gray-600 hover:bg-gray-50 transition-colors">
+              <RotateCw size={13} />
+              Remind pending participants
+            </button>
+            <button className="flex items-center gap-1.5 text-sm font-medium bg-gray-900 text-white px-3.5 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+              <UserPlus size={13} />
+              Add participant
+            </button>
+          </>
+        }
+      />
 
       {/* Filter tabs */}
       <div className="flex border-b border-gray-200">
