@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Shuffle, RotateCcw, X, Search } from "lucide-react";
+import { Shuffle, RotateCcw, X, Search, Upload } from "lucide-react";
+import { importAssignmentsFromFile } from "../utils/importAssignments";
 import { RoomListView } from "./RoomListView";
 import { ParticipantDrawer } from "./ParticipantDrawer";
 import { AssignParticipantModal } from "./AssignParticipantModal";
@@ -199,6 +200,79 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
       duration: 2000,
     });
     setTargetSlot(null);
+  }
+
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportFile(file: File) {
+    try {
+      const { assignments, warnings } = await importAssignmentsFromFile(file);
+      if (assignments.length === 0) {
+        toast.error("No assignments found", {
+          description: warnings[0] ?? "Check that columns include participant and room.",
+        });
+        return;
+      }
+
+      const snapshot = buildings;
+
+      // Build lookup tables (case-insensitive).
+      const participantByName = new Map<string, Participant>();
+      participants.forEach((p) => participantByName.set(p.name.trim().toLowerCase(), p));
+
+      const skipped: string[] = [];
+      let placed = 0;
+      const assignedSoFar = new Set(assignedIds);
+
+      const next = buildings.map((b) => ({
+        ...b,
+        rooms: b.rooms.map((r) => ({ ...r, slots: r.slots.map((s) => ({ ...s })) })),
+      }));
+
+      for (const { participantName, roomName } of assignments) {
+        const participant = participantByName.get(participantName.toLowerCase());
+        if (!participant) {
+          skipped.push(`${participantName} (not found)`);
+          continue;
+        }
+        if (assignedSoFar.has(participant.id)) {
+          skipped.push(`${participantName} (already assigned)`);
+          continue;
+        }
+        const targetRoom = next
+          .flatMap((b) => b.rooms)
+          .find((r) => r.name.trim().toLowerCase() === roomName.trim().toLowerCase());
+        if (!targetRoom) {
+          skipped.push(`${participantName} → ${roomName} (room not found)`);
+          continue;
+        }
+        const emptySlot = targetRoom.slots.find((s) => !s.participant);
+        if (!emptySlot) {
+          skipped.push(`${participantName} → ${roomName} (room full)`);
+          continue;
+        }
+        emptySlot.participant = participant;
+        assignedSoFar.add(participant.id);
+        placed++;
+      }
+
+      setBuildings(next);
+
+      const totalWarnings = warnings.length + skipped.length;
+      const description =
+        totalWarnings > 0
+          ? `${totalWarnings} skipped${skipped.length ? ` — ${skipped.slice(0, 3).join("; ")}${skipped.length > 3 ? "…" : ""}` : ""}`
+          : undefined;
+      toast.success(`${placed} participant${placed !== 1 ? "s" : ""} assigned`, {
+        description,
+        action: { label: "Undo", onClick: () => setBuildings(snapshot) },
+        duration: 6000,
+      });
+    } catch (err) {
+      toast.error("Import failed", {
+        description: err instanceof Error ? err.message : "Couldn't read this file.",
+      });
+    }
   }
 
   function handleStartOver() {
@@ -466,6 +540,25 @@ export function GestionDesChambres({ hideTitle = false }: { hideTitle?: boolean 
           </div>
         )}
         <div className="flex items-center gap-2 ml-auto">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls,.pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportFile(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={() => importInputRef.current?.click()}
+            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-4 py-2 text-gray-600 hover:bg-gray-50 transition-colors"
+            title="Import assignments from CSV or Excel"
+          >
+            <Upload size={13} />
+            Import
+          </button>
           <button
             onClick={handleStartOver}
             className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-4 py-2 text-gray-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"

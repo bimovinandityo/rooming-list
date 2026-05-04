@@ -218,7 +218,7 @@ export function GuestList({
   }, [participants, search, tab]);
 
   const TABS = [
-    { key: "all" as const, label: "Tous", count: participants.length },
+    { key: "all" as const, label: "All", count: participants.length },
     { key: "dates" as const, label: "Non-standard dates", count: nonStandardCount },
     { key: "special" as const, label: "Special needs", count: specialCount },
   ];

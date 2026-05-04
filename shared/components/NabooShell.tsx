@@ -6,7 +6,7 @@ import {
   CreditCard,
   Monitor,
   Hotel,
-  Package,
+  CalendarDays,
   Megaphone,
   MessageSquare,
   ChefHat,
@@ -18,7 +18,26 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, type ElementType, type ReactNode } from "react";
 
-export type ActiveKey = "participants-rooming-list" | "rooming-list-builder";
+export type ActiveKey =
+  | "carts"
+  | "my-brief"
+  | "documents"
+  | "payments"
+  | "event-website"
+  | "event-website-forms"
+  | "guest-list"
+  | "participants-rooming-list"
+  | "attachments"
+  | "logistics-information"
+  | "logistics-schedule"
+  | "logistics-menus"
+  | "logistics-contacts"
+  | "announcements"
+  | "feedback"
+  | "menu-builder"
+  | "rooming-list-builder"
+  | "access-roles"
+  | "preparation-sejour"; // legacy alias
 
 interface SubNavItem {
   label: string;
@@ -44,15 +63,15 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "BOOKING",
     items: [
-      { icon: ShoppingCart, label: "Carts" },
-      { icon: FileText, label: "My brief" },
+      { icon: ShoppingCart, label: "Carts", href: "/carts", activeKey: "carts" },
+      { icon: FileText, label: "My brief", href: "/my-brief", activeKey: "my-brief" },
     ],
   },
   {
     title: "LEGAL & FINANCE",
     items: [
-      { icon: FileText, label: "Documents" },
-      { icon: CreditCard, label: "Payments" },
+      { icon: FileText, label: "Documents", href: "/documents", activeKey: "documents" },
+      { icon: CreditCard, label: "Payments", href: "/payments", activeKey: "payments" },
     ],
   },
   {
@@ -61,30 +80,72 @@ const NAV_SECTIONS: NavSection[] = [
       {
         icon: Monitor,
         label: "Event website",
-        children: [{ label: "Event editor" }, { label: "Forms" }],
+        href: "/event-website?tab=editor",
+        parentActiveKeys: ["event-website", "event-website-forms"],
+        children: [
+          {
+            label: "Editor",
+            href: "/event-website?tab=editor",
+            activeKey: "event-website",
+          },
+          {
+            label: "Forms",
+            href: "/event-website?tab=forms",
+            activeKey: "event-website-forms",
+          },
+        ],
       },
       {
         icon: Hotel,
         label: "Accommodation",
-        parentActiveKeys: ["participants-rooming-list"],
+        href: "/admin-v2?tab=guests",
+        parentActiveKeys: ["participants-rooming-list", "guest-list", "attachments"],
         children: [
-          { label: "Guest list" },
+          { label: "Guest list", href: "/admin-v2?tab=guests", activeKey: "guest-list" },
           {
             label: "Rooming list",
-            href: "/admin-v2",
+            href: "/admin-v2?tab=rooming",
             activeKey: "participants-rooming-list",
           },
-          { label: "Attachments" },
+          {
+            label: "Attachments",
+            href: "/admin-v2?tab=attachments",
+            activeKey: "attachments",
+          },
         ],
       },
       {
-        icon: Package,
+        icon: CalendarDays,
         label: "Logistics",
+        href: "/preparation-du-sejour?tab=information",
+        parentActiveKeys: [
+          "preparation-sejour",
+          "logistics-information",
+          "logistics-schedule",
+          "logistics-menus",
+          "logistics-contacts",
+        ],
         children: [
-          { label: "Basic information" },
-          { label: "Schedule" },
-          { label: "Menus" },
-          { label: "Contacts" },
+          {
+            label: "Basic information",
+            href: "/preparation-du-sejour?tab=information",
+            activeKey: "logistics-information",
+          },
+          {
+            label: "Schedule",
+            href: "/preparation-du-sejour?tab=schedule",
+            activeKey: "logistics-schedule",
+          },
+          {
+            label: "Menus",
+            href: "/preparation-du-sejour?tab=menus",
+            activeKey: "logistics-menus",
+          },
+          {
+            label: "Contacts",
+            href: "/preparation-du-sejour?tab=contacts",
+            activeKey: "logistics-contacts",
+          },
         ],
       },
     ],
@@ -92,24 +153,46 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "COMMUNICATION",
     items: [
-      { icon: Megaphone, label: "Announcements" },
-      { icon: MessageSquare, label: "Feedback" },
+      {
+        icon: Megaphone,
+        label: "Announcements",
+        href: "/announcements",
+        activeKey: "announcements",
+      },
+      {
+        icon: MessageSquare,
+        label: "Feedback",
+        href: "/feedback",
+        activeKey: "feedback",
+      },
     ],
   },
   {
     title: "ADMIN",
     items: [
-      { icon: ChefHat, label: "Menu builder" },
+      {
+        icon: ChefHat,
+        label: "Menu builder",
+        href: "/menu-builder",
+        activeKey: "menu-builder",
+      },
       {
         icon: BedDouble,
         label: "Rooming list builder",
         href: "/rooming-list-builder",
         activeKey: "rooming-list-builder",
       },
-      { icon: Shield, label: "Access & roles" },
+      {
+        icon: Shield,
+        label: "Access & roles",
+        href: "/access-roles",
+        activeKey: "access-roles",
+      },
     ],
   },
 ];
+
+const SIDEBAR_SCROLL_KEY = "naboo:sidebar-scroll";
 
 export function NabooShell({
   children,
@@ -120,7 +203,29 @@ export function NabooShell({
 }) {
   const sidebarRef = useRef<HTMLElement>(null);
 
+  // Restore the sidebar's scroll position across navigations so clicking a
+  // sidebar link doesn't visually reset the menu.
   useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+      if (stored !== null) el.scrollTop = parseInt(stored, 10) || 0;
+    }
+    const onScroll = () => {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(el.scrollTop));
+      }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // First-time hint: scroll to the bottom for the rooming-list-builder route
+  // (where the matching nav item lives), but only if no stored position yet.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem(SIDEBAR_SCROLL_KEY) !== null) return;
     if (activeItem === "rooming-list-builder" && sidebarRef.current) {
       sidebarRef.current.scrollTo({ top: sidebarRef.current.scrollHeight, behavior: "smooth" });
     }

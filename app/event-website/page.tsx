@@ -3,12 +3,10 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { NabooShell, type ActiveKey } from "@/shared/components/NabooShell";
-import { AdminTabView } from "@/features/rooming-list/components-v2/AdminTabView";
+import { EventWebsiteView } from "@/features/event-website/components/EventWebsiteView";
 
 function activeKeyForTab(tab: string | null): ActiveKey {
-  if (tab === "guests") return "guest-list";
-  if (tab === "attachments") return "attachments";
-  return "participants-rooming-list";
+  return tab === "forms" ? "event-website-forms" : "event-website";
 }
 
 function PageInner() {
@@ -16,12 +14,12 @@ function PageInner() {
   const activeItem = activeKeyForTab(search?.get("tab") ?? null);
   return (
     <NabooShell activeItem={activeItem}>
-      <AdminTabView />
+      <EventWebsiteView />
     </NabooShell>
   );
 }
 
-export default function AdminV2Page() {
+export default function EventWebsitePage() {
   return (
     <Suspense fallback={null}>
       <PageInner />
